@@ -202,6 +202,22 @@ describe("no-use-after-consume", () => {
           `,
         },
 
+        // Mutually exclusive if / else-if / else branches — no use-after-consume
+        {
+          code: `
+            function diagLike(a, n, k) {
+              const ret = where(eye(n).equal(1), a.ref, zerosLike(a));
+              if (k > 0) {
+                return pad(ret, [[0, k], [k, 0]]);
+              } else if (k < 0) {
+                return pad(ret, [[-k, 0], [0, -k]]);
+              } else {
+                return ret;
+              }
+            }
+          `,
+        },
+
         // Expression evaluation order: x.reshape([...x.shape])
         // Arguments are evaluated before the method call,
         // so x.shape is read while x is still alive.

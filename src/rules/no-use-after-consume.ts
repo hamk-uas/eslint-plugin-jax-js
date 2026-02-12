@@ -205,6 +205,16 @@ function areInMutuallyExclusiveBranches(
   node1: ESTree.Node,
   node2: ESTree.Node,
 ): boolean {
+  // IfStatement branches (if/else and if/else-if/else chains):
+  // nodes are mutually exclusive if one is in the consequent subtree
+  // and the other is in the alternate subtree of the same IfStatement.
+  const ifAncestors1 = getIfAncestors(node1);
+  for (const ifStmt of ifAncestors1) {
+    const side1 = getIfBranchSide(node1, ifStmt);
+    const side2 = getIfBranchSide(node2, ifStmt);
+    if (side1 && side2 && side1 !== side2) return true;
+  }
+
   // Find the common conditional ancestor
   const cond1 = getConditionalAncestor(node1);
   const cond2 = getConditionalAncestor(node2);
@@ -224,6 +234,38 @@ function areInMutuallyExclusiveBranches(
   // they'll both execute or neither will — they're NOT mutually exclusive.
   // But consumption in left and reference in right are sequential, not exclusive.
   return false;
+}
+
+function getIfAncestors(node: ESTree.Node): ESTree.IfStatement[] {
+  const result: ESTree.IfStatement[] = [];
+  let current: ESTree.Node | undefined = node;
+  while (current) {
+    const parent = parentOf(current);
+    if (!parent) break;
+    if (parent.type === "IfStatement") {
+      result.push(parent as ESTree.IfStatement);
+    }
+    current = parent;
+  }
+  return result;
+}
+
+function getIfBranchSide(
+  node: ESTree.Node,
+  ifStmt: ESTree.IfStatement,
+): "consequent" | "alternate" | null {
+  let current: ESTree.Node | undefined = node;
+  while (current) {
+    const parent = parentOf(current);
+    if (!parent) break;
+    if (parent === ifStmt) {
+      if (ifStmt.consequent === current) return "consequent";
+      if (ifStmt.alternate === current) return "alternate";
+      return null;
+    }
+    current = parent;
+  }
+  return null;
 }
 
 /**
