@@ -213,8 +213,8 @@ export default [
 
 ### Recommended config (TypeScript project)
 
-Create `eslint.config.ts` (or `eslint.config.js`) with the TypeScript parser
-and the plugin's recommended rules:
+Create `eslint.config.ts` with the TypeScript parser and the plugin's
+recommended rules:
 
 ```ts
 // eslint.config.ts
@@ -289,6 +289,24 @@ export default [
   },
 ];
 ```
+
+### Troubleshooting
+
+**`ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING` when loading the plugin**
+
+If you see:
+
+```
+Error [ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING]: Stripping types is currently
+unsupported for files under node_modules, for .../eslint-plugin-jax-js/src/index.ts
+```
+
+your ESLint config file is probably `eslint.config.js`. Node's built-in type
+stripping does not apply to files inside `node_modules`, so ESLint cannot load
+the plugin's TypeScript source when the config itself is a plain `.js` file.
+
+**Fix:** rename your config to `eslint.config.ts`. ESLint then uses `jiti` to
+load the config **and** the plugin, bypassing Node's `node_modules` restriction.
 
 ## IDE Integration
 
