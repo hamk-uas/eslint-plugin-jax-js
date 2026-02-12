@@ -1,0 +1,47 @@
+{
+  "name": "eslint-plugin-jax-js",
+  "version": "0.1.0",
+  "description": "ESLint rules for jax-js array lifetime management — catch memory leaks at edit time",
+  "keywords": [
+    "eslint",
+    "eslintplugin",
+    "eslint-plugin",
+    "jax-js",
+    "memory-leak",
+    "array-lifetime",
+    "consume",
+    "dispose",
+    "ref"
+  ],
+  "license": "MIT",
+  "type": "module",
+  "main": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "src"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hamk-uas/eslint-plugin-jax-js"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "peerDependencies": {
+    "eslint": ">=9.0.0",
+    "@jax-js/jax": ">=0.1.0 <0.3.0"
+  },
+  "peerDependenciesMeta": {
+    "@jax-js/jax": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "eslint": "^9.31.0",
+    "typescript": "~5.9.3",
+    "vitest": "^4.0.9"
+  }
+}
