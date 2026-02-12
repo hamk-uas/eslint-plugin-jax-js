@@ -444,6 +444,7 @@ npm publish
 
 | Change | Bump |
 |--------|------|
+| Bug fix (false positive/negative, crash, wrong autofix) | **patch** |
 | New jax-js methods added to API surface | **patch** |
 | New lint rule or rule behavior change | **minor** |
 | Breaking: removed rule, changed defaults, ownership model change | **major** |
