@@ -92,7 +92,9 @@ Consumption is detected from:
 
 Known non-consuming callees (`console.log`, `expect`, etc.)
 are automatically excluded. For your own non-consuming helpers, add a
-`// @jax-borrow` comment:
+`// @jax-borrow` comment.
+
+**Suggestion fix:** Inserts `.ref` at the consuming site.
 
 ```ts
 // ❌ Bad — x is consumed by .add(), then used again
@@ -116,8 +118,6 @@ const x = np.zeros([3]);
 myLogger(x); // @jax-borrow
 x.dispose();
 ```
-
-**Suggestion fix:** Inserts `.ref` at the consuming site.
 
 ### `@jax-js/require-consume`
 
