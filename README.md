@@ -41,19 +41,27 @@ If a warning doesn't apply to your situation, you have two options:
 ## Installation
 
 ```bash
-npm install --save-dev github:hamk-uas/eslint-plugin-jax-js
+npm install --save-dev eslint jiti @typescript-eslint/parser github:hamk-uas/eslint-plugin-jax-js
 ```
 
-This installs from the latest commit on `main`. To pin a specific release:
+To pin a specific release tag instead of `main`:
 
 ```bash
-npm install --save-dev github:hamk-uas/eslint-plugin-jax-js#v0.1.0
+npm install --save-dev eslint jiti @typescript-eslint/parser github:hamk-uas/eslint-plugin-jax-js#v0.1.0
 ```
 
 See [releases](https://github.com/hamk-uas/eslint-plugin-jax-js/releases) for available tags.
 
-The plugin requires **ESLint v9+** (flat config). It ships as TypeScript source
-(no build step needed) — ESLint v9 loads it via its built-in `jiti` transpiler.
+**Prerequisites:**
+
+| Dependency | Why |
+|---|---|
+| `eslint` ≥ 9 | Flat config required. v9 and v10 both work. |
+| `jiti` | Loads the plugin's TypeScript source. Built into ESLint v9; must be installed explicitly for ESLint v10+. |
+| `@typescript-eslint/parser` | Parses `.ts` files. ESLint's default parser only handles JavaScript. |
+
+The plugin ships as TypeScript source (no build step needed) — ESLint loads it
+via the `jiti` transpiler at runtime.
 
 ## Rules
 
@@ -203,18 +211,44 @@ export default [
 
 ## Setup
 
-### Recommended config (all rules as warnings)
+### Recommended config (TypeScript project)
 
-Add the plugin to your flat ESLint config:
+Create `eslint.config.ts` (or `eslint.config.js`) with the TypeScript parser
+and the plugin's recommended rules:
 
 ```ts
-// eslint.config.ts (or eslint.config.js)
+// eslint.config.ts
 import jaxJs from "@hamk-uas/eslint-plugin-jax-js";
+import tsParser from "@typescript-eslint/parser";
 
 export default [
-  // ... your other config
-  jaxJs.configs.recommended,
+  {
+    files: ["src/**/*.ts"],
+    languageOptions: { parser: tsParser },
+    ...jaxJs.configs.recommended,
+  },
 ];
+```
+
+> **Why `files` and `parser`?** ESLint's flat config only processes `.js`/`.mjs`/`.cjs`
+> by default and uses a JavaScript-only parser. Without `files: ["**/*.ts"]` your
+> TypeScript files are silently skipped, and without `@typescript-eslint/parser`
+> they fail to parse.
+
+If you already have a `typescript-eslint` config, just add the plugin's recommended
+config to your existing array — the parser and file globs are already set:
+
+```ts
+import jaxJs from "@hamk-uas/eslint-plugin-jax-js";
+import tseslint from "typescript-eslint";
+
+export default tseslint.config(
+  ...tseslint.configs.recommended,
+  {
+    files: ["src/**/*.ts"],
+    ...jaxJs.configs.recommended,
+  },
+);
 ```
 
 ### Individual rules
@@ -223,9 +257,12 @@ Or enable rules individually:
 
 ```ts
 import jaxJs from "@hamk-uas/eslint-plugin-jax-js";
+import tsParser from "@typescript-eslint/parser";
 
 export default [
   {
+    files: ["src/**/*.ts"],
+    languageOptions: { parser: tsParser },
     plugins: { "@jax-js": jaxJs },
     rules: {
       "@jax-js/no-unnecessary-ref": "warn",
@@ -236,16 +273,18 @@ export default [
 ];
 ```
 
-### Limiting to specific files
+### Limiting to specific directories
 
-If your project mixes jax-js code with other code, you can scope the rules to specific directories:
+If your project mixes jax-js code with other code, narrow the `files` glob:
 
 ```ts
 import jaxJs from "@hamk-uas/eslint-plugin-jax-js";
+import tsParser from "@typescript-eslint/parser";
 
 export default [
   {
     files: ["src/math/**/*.ts", "src/ml/**/*.ts"],
+    languageOptions: { parser: tsParser },
     ...jaxJs.configs.recommended,
   },
 ];

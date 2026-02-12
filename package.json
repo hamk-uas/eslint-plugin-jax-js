@@ -31,7 +31,7 @@
     "test:watch": "vitest"
   },
   "peerDependencies": {
-    "eslint": ">=9.0.0",
+    "eslint": ">=9.0.0 || >=10.0.0",
     "@jax-js/jax": ">=0.1.0 <0.3.0"
   },
   "peerDependenciesMeta": {
