@@ -404,9 +404,9 @@ The rules understand several patterns:
   it will be caught on `y` if `y` is also tracked).
 
 - **TypeScript source, no build step.** The plugin ships raw `.ts` files and relies
-  on ESLint v9's `jiti` transpiler. This simplifies development and contribution
-  but means the plugin won't work with ESLint v8 or custom loaders that don't
-  support TypeScript.
+  on the `jiti` transpiler (built into ESLint v9; installed as a dependency for
+  v10+). This simplifies development and contribution but means the plugin won't
+  work with ESLint v8 or custom loaders that don't support TypeScript.
 
 - **Heuristic-based, no import tracking.** The rules identify jax-js arrays by
   recognizing factory calls (`np.zeros()`), method names (`.add()`, `.reshape()`),
