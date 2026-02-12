@@ -566,6 +566,7 @@ npm install --save-dev github:hamk-uas/eslint-plugin-jax-js#v0.1.1
 
 | Change | Bump |
 |--------|------|
+| Documentation only (README, comments) | **no bump** — users on `main` get it automatically |
 | Bug fix (false positive/negative, crash, wrong autofix) | **patch** |
 | New jax-js methods added to API surface | **patch** |
 | New lint rule or rule behavior change | **minor** |
