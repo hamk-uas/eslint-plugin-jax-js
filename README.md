@@ -57,6 +57,14 @@ The plugin requires **ESLint v9+** (flat config). It ships as TypeScript source
 
 ## Rules
 
+Each rule reports warnings and can offer automatic code changes through ESLint:
+
+- **Autofix** (ESLint *fix*) — applied automatically on save or via `eslint --fix`.
+  Safe transforms that never change program behavior.
+- **Suggestion** (ESLint *suggestion*) — shown as a lightbulb (💡) quick fix in your editor.
+  Requires manual confirmation because the change may need review (e.g., inserting `.ref`
+  means you also need a matching `.dispose()`).
+
 ### `@jax-js/no-unnecessary-ref`
 
 Warns when `.ref` is used on a variable whose last usage is the `.ref` chain itself. This is a
@@ -94,8 +102,8 @@ Known non-consuming callees (`console.log`, `expect`, etc.)
 are automatically excluded. For your own non-consuming helpers, add a
 `// @jax-borrow` comment.
 
-**Quick fix:** Offers to insert `.ref` before the consuming call (e.g., `x.add(1)` → `x.ref.add(1)`),
-so the array stays alive for later use.
+**Suggestion:** Inserts `.ref` before the consuming call
+(e.g., `x.add(1)` → `x.ref.add(1)`), so the array stays alive for later use.
 
 ```ts
 // ❌ Bad — x is consumed by .add(), then used again
@@ -137,7 +145,7 @@ console.log(x.shape);
 x.dispose();
 ```
 
-**Suggestion fix:** Adds `.dispose()` after last use.
+**Suggestion:** Adds `.dispose()` after last use.
 
 > **Note:** All three rules include the hint *(Can be ignored inside jit.)* in their
 > messages. See [Design philosophy](#design-philosophy) for why the plugin warns inside
