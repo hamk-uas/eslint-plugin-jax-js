@@ -312,6 +312,18 @@ If jax-js adds new methods, update `src/api-surface.generated.ts` accordingly.
 This section is for maintainers of the plugin itself — if you're just using the plugin
 in your project, you can stop reading here.
 
+### Initial setup
+
+After cloning the repo, enable the pre-commit hook:
+
+```bash
+npm install
+git config core.hooksPath .githooks
+```
+
+This runs tests and type-checking before every commit. The hook lives in
+`.githooks/pre-commit` and requires no extra dependencies.
+
 ### Bug Fixes
 
 #### Workflow

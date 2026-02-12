@@ -1,0 +1,13 @@
+#!/bin/sh
+# Pre-commit hook: run tests and type-check before allowing a commit.
+# To enable: git config core.hooksPath .githooks
+
+set -e
+
+echo "Running tests..."
+npm test
+
+echo "Type-checking..."
+npx tsc --noEmit
+
+echo "All checks passed."
