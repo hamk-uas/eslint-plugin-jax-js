@@ -13,6 +13,7 @@ import requireConsume from "./rules/require-consume";
 const plugin: ESLint.Plugin = {
   meta: {
     name: "eslint-plugin-jax-js",
+    // Keep in sync with version in package.json
     version: "0.1.0",
   },
   rules: {

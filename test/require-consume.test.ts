@@ -75,11 +75,27 @@ describe("require-consume", () => {
             const y = x;
           `,
         },
+        // Await-wrapped array init — still detected
+        {
+          code: `
+            async function f() {
+              const x = await np.zeros([3]);
+              x.dispose();
+            }
+          `,
+        },
         // Not an array-producing call — no warning
         {
           code: `
             const x = someOtherFunction();
             console.log(x.shape);
+          `,
+        },
+        // Destructuring declaration — rule skips non-Identifier patterns
+        {
+          code: `
+            const { a, b } = getArrays();
+            console.log(a.shape);
           `,
         },
         // Array consumed by .item()
@@ -323,6 +339,32 @@ y.dispose();
             const y = x.reshape([3, 3]);
             console.log(y.shape);
 y.dispose();
+          `,
+                },
+              ],
+            },
+          ],
+        },
+        // Await-wrapped array init never consumed
+        {
+          code: `
+            async function f() {
+              const x = await np.zeros([3]);
+              console.log(x.shape);
+            }
+          `,
+          errors: [
+            {
+              messageId: "onlyPropertyAccess",
+              suggestions: [
+                {
+                  messageId: "suggestDispose",
+                  output: `
+            async function f() {
+              const x = await np.zeros([3]);
+              console.log(x.shape);
+x.dispose();
+            }
           `,
                 },
               ],

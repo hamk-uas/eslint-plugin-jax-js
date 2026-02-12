@@ -83,6 +83,12 @@ describe("no-unnecessary-ref", () => {
             for (const t of consts) t.ref;
           `,
         },
+        // .ref in for-in loop — intentional rc-bump on borrowed reference
+        {
+          code: `
+            for (const t in consts) t.ref;
+          `,
+        },
         // .ref needed because variable is consumed BEFORE .ref in same expression
         // e.g., equal(a, min(a.ref, axis))
         {

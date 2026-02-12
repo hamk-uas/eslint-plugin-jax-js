@@ -21,7 +21,7 @@ import { EXTRACTED_GETTERS, EXTRACTED_METHODS } from "./api-surface.generated";
  * Methods that consume the array and return a non-Array value.
  * MANUAL — update when adding a new terminal method to the Array class.
  */
-export const CONSUMING_TERMINAL_METHODS = new Set([
+export const CONSUMING_TERMINAL_METHODS = new Set<string>([
   "data",
   "dataSync",
   "js",
@@ -35,16 +35,20 @@ export const CONSUMING_TERMINAL_METHODS = new Set([
 
 /**
  * Methods that are syntactically methods but do NOT consume the array.
- * `toString` — non-consuming string conversion.
- * `blockUntilReady` — sync barrier that returns `this` unchanged.
+ *
+ * `toString`  — returns a string representation without consuming the array.
+ *              Unlike most Array methods, it does not decrement the reference
+ *              count, matching standard JS `Object.prototype.toString` semantics.
+ * `blockUntilReady` — sync barrier that returns `this` unchanged; used for
+ *                     timing/benchmarking without affecting ownership.
  */
-const NON_CONSUMING_METHODS = new Set(["toString", "blockUntilReady"]);
+const NON_CONSUMING_METHODS = new Set<string>(["toString", "blockUntilReady"]);
 
 /**
  * Getters/properties/methods that are NOT consuming.
  * Includes extracted getters plus manually-listed non-consuming methods.
  */
-export const NON_CONSUMING_PROPS = new Set([
+export const NON_CONSUMING_PROPS = new Set<string>([
   ...EXTRACTED_GETTERS,
   ...NON_CONSUMING_METHODS,
 ]);
@@ -53,7 +57,7 @@ export const NON_CONSUMING_PROPS = new Set([
  * Methods on Array/Tracer that consume `this` and return a new Array.
  * Auto-computed: all extracted methods minus terminal and non-consuming ones.
  */
-export const ARRAY_RETURNING_METHODS = new Set(
+export const ARRAY_RETURNING_METHODS = new Set<string>(
   EXTRACTED_METHODS.filter(
     (m) => !CONSUMING_TERMINAL_METHODS.has(m) && !NON_CONSUMING_METHODS.has(m),
   ),
@@ -65,7 +69,7 @@ export const ARRAY_RETURNING_METHODS = new Set(
  * scratch (not class methods). They span multiple source files and are
  * not worth auto-extracting since the set is small and very stable.
  */
-export const ARRAY_FACTORY_NAMES = new Set([
+export const ARRAY_FACTORY_NAMES = new Set<string>([
   "array",
   "zeros",
   "ones",
@@ -102,7 +106,7 @@ export const ARRAY_FACTORY_NAMES = new Set([
  * so seeing them strongly implies jax-js Array usage.
  * MANUAL — requires knowing which names collide with standard JS APIs.
  */
-export const UNAMBIGUOUS_ARRAY_METHODS = new Set([
+export const UNAMBIGUOUS_ARRAY_METHODS = new Set<string>([
   "neg",
   "astype",
   "transpose",

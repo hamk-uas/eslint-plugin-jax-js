@@ -27,6 +27,19 @@ describe("no-use-after-consume", () => {
         // Passed to non-jax function — not tracked as consuming
         "const x = np.zeros([3]); foo(x); bar(x);",
 
+        // super() call — not tracked as consuming
+        {
+          code: `
+            class Foo extends Bar {
+              constructor() {
+                const x = np.zeros([3]);
+                super();
+                x.dispose();
+              }
+            }
+          `,
+        },
+
         // Multiple .ref usages — .ref doesn't invalidate
         "const x = np.zeros([3]); x.ref.add(1); x.ref.mul(2); x.dispose();",
 

@@ -131,8 +131,11 @@ function getConsumingSite(identifier: ESTree.Identifier): ConsumingSite | null {
     parent.type === "CallExpression" &&
     (parent as ESTree.CallExpression).arguments.includes(identifier as any)
   ) {
-    const desc = describeJaxCall((parent as ESTree.CallExpression).callee);
-    if (desc) return { description: desc, identifier, kind: "argument" };
+    const callee = (parent as ESTree.CallExpression).callee;
+    if (callee.type !== "Super") {
+      const desc = describeJaxCall(callee);
+      if (desc) return { description: desc, identifier, kind: "argument" };
+    }
   }
 
   return null;
@@ -362,9 +365,7 @@ const rule: Rule.RuleModule = {
                   messageId: "suggestRef",
                   data: { consumedLine },
                   fix: (fixer) =>
-                    consumedBy!.kind === "method"
-                      ? fixer.insertTextAfter(consumedBy!.identifier, ".ref")
-                      : fixer.insertTextAfter(consumedBy!.identifier, ".ref"),
+                    fixer.insertTextAfter(consumedBy!.identifier, ".ref"),
                 },
               ],
             });

@@ -8,8 +8,7 @@
     "skipLibCheck": true,
     "outDir": "dist",
     "rootDir": ".",
-    "declaration": true,
-    "types": ["node"]
+    "declaration": true
   },
   "include": ["src", "test"]
 }
