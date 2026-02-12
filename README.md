@@ -41,10 +41,16 @@ If a warning doesn't apply to your situation, you have two options:
 ## Installation
 
 ```bash
+npm install --save-dev github:hamk-uas/eslint-plugin-jax-js
+```
+
+This installs from the latest commit on `main`. To pin a specific release:
+
+```bash
 npm install --save-dev github:hamk-uas/eslint-plugin-jax-js#v0.1.0
 ```
 
-Replace `v0.1.0` with the [latest release tag](https://github.com/hamk-uas/eslint-plugin-jax-js/releases).
+See [releases](https://github.com/hamk-uas/eslint-plugin-jax-js/releases) for available tags.
 
 The plugin requires **ESLint v9+** (flat config). It ships as TypeScript source
 (no build step needed) — ESLint v9 loads it via its built-in `jiti` transpiler.
