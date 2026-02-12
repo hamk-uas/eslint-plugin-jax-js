@@ -4,8 +4,10 @@ Community ESLint plugin for catching **array memory leaks** in [jax-js](https://
 
 jax-js uses a consuming ownership model: most operations dispose their input arrays automatically.
 If you create an array and never pass it to an operation or call `.dispose()`, the underlying
-backend memory leaks. These lint rules catch the most common leak patterns statically, so you get
-red squiggles in your editor instead of discovering leaks at runtime with `checkLeaks`.
+backend memory leaks. Calling `.ref` bumps the reference count so an array survives past a
+consuming operation, but forgetting to `.dispose()` the extra reference also leaks.
+These lint rules catch the most common leak patterns statically, so you get
+red squiggles in your editor instead of discovering leaks at runtime.
 
 ## Design philosophy
 
