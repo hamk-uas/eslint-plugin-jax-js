@@ -24,9 +24,12 @@ development (debugging, profiling, adding logging). By keeping your code
 ownership-correct at all times, `jit()` becomes a pure performance optimization you can
 add or remove without changing program semantics.
 
-When a warning is genuinely wrong for your situation (e.g., a long-lived cache, or a
-pattern the heuristics cannot follow), suppress it with an `eslint-disable` comment and
-a short reason — see [Suppressing warnings](#suppressing-warnings-deliberate-exceptions).
+If a warning doesn't apply to your situation, you have two options:
+
+- **`// @jax-borrow`** — for calls to your own non-consuming helpers
+  (see [`no-use-after-consume`](#jax-jsno-use-after-consume)).
+- **`eslint-disable`** — for anything else (long-lived caches, intentional leaks, etc.).
+  See [Suppressing warnings](#suppressing-warnings-deliberate-exceptions).
 
 > **A note for the jax-js ecosystem:** The ideal long-term solution would be for jax-js
 > itself to enforce ownership rules during `jit()` tracing — i.e., raise an error when
