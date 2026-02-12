@@ -338,7 +338,7 @@ const rule: Rule.RuleModule = {
      * Check if the call containing `identifier` has a `// @jax-borrow`
      * comment directive on the same line or the line above.
      */
-    function lineHasJaxSafe(identifier: ESTree.Identifier): boolean {
+    function lineHasJaxBorrow(identifier: ESTree.Identifier): boolean {
       const call = parentOf(identifier);
       const line = call?.loc?.start.line ?? identifier.loc?.start.line;
       if (!line) return false;
@@ -424,7 +424,7 @@ const rule: Rule.RuleModule = {
           const site = getConsumingSite(ref.identifier);
           if (site && !isConsumeAndReassign(ref.identifier, varName)) {
             // User can suppress arbitrary-call consumption via // @jax-borrow
-            if (site.kind === "argument" && lineHasJaxSafe(site.identifier)) {
+            if (site.kind === "argument" && lineHasJaxBorrow(site.identifier)) {
               continue;
             }
             consumedBy = site;
