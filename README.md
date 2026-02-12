@@ -26,6 +26,13 @@ When a warning is genuinely wrong for your situation (e.g., a long-lived cache, 
 pattern the heuristics cannot follow), suppress it with an `eslint-disable` comment and
 a short reason — see [Suppressing warnings](#suppressing-warnings-deliberate-exceptions).
 
+> **A note for the jax-js ecosystem:** The ideal long-term solution would be for jax-js
+> itself to enforce ownership rules during `jit()` tracing — i.e., raise an error when
+> traced code uses an array after it has been consumed, just as eager mode does. That
+> would make ownership-correct code a hard requirement rather than a best practice, and
+> this lint plugin would then have zero false positives inside `jit()`. Until that
+> happens, the plugin fills the gap statically.
+
 ## Installation
 
 ```bash
