@@ -144,26 +144,53 @@ export function isArrayInit(
   init: ESTree.Expression | null | undefined,
 ): boolean {
   if (!init) return false;
-  if (init.type === "CallExpression" && isArrayFactory(init)) return true;
+  const unwrapped = unwrapTransparentExpression(init as any) as ESTree.Expression;
+
+  if (unwrapped.type === "CallExpression" && isArrayFactory(unwrapped)) return true;
   if (
-    init.type === "CallExpression" &&
-    init.callee.type === "MemberExpression" &&
-    !init.callee.computed &&
-    init.callee.property.type === "Identifier" &&
-    UNAMBIGUOUS_ARRAY_METHODS.has(init.callee.property.name)
+    unwrapped.type === "CallExpression" &&
+    unwrapped.callee.type === "MemberExpression" &&
+    !unwrapped.callee.computed &&
+    unwrapped.callee.property.type === "Identifier" &&
+    UNAMBIGUOUS_ARRAY_METHODS.has(unwrapped.callee.property.name)
   ) {
     return true;
   }
   if (
-    init.type === "MemberExpression" &&
-    !init.computed &&
-    init.property.type === "Identifier" &&
-    init.property.name === "ref"
+    unwrapped.type === "MemberExpression" &&
+    !unwrapped.computed &&
+    unwrapped.property.type === "Identifier" &&
+    unwrapped.property.name === "ref"
   ) {
     return true;
   }
-  if (init.type === "AwaitExpression") return isArrayInit(init.argument);
+  if (unwrapped.type === "AwaitExpression") return isArrayInit(unwrapped.argument as any);
   return false;
+}
+
+/**
+ * Unwrap expression wrappers that are transparent to the value.
+ *
+ * This keeps the plugin effective in TypeScript projects where array inits are
+ * often wrapped (casts, non-null assertions, parentheses).
+ */
+function unwrapTransparentExpression(node: any): any {
+  let current = node;
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    if (!current || typeof current.type !== "string") return current;
+    if (
+      current.type === "ParenthesizedExpression" ||
+      current.type === "TSAsExpression" ||
+      current.type === "TSNonNullExpression" ||
+      current.type === "TSSatisfiesExpression" ||
+      current.type === "TSTypeAssertion"
+    ) {
+      current = current.expression;
+      continue;
+    }
+    return current;
+  }
 }
 
 // ---------------------------------------------------------------------------

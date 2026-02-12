@@ -83,6 +83,51 @@ x.dispose();
 > **Note:** All three rules include the hint *(Can be ignored inside jit.)* since
 > jax-js's `jit()` traces array operations symbolically and does not actually consume arrays.
 
+## Suppressing warnings (deliberate exceptions)
+
+Sometimes a warning is intentional (e.g., you knowingly keep an array alive in a cache, or you're
+inside a `jit()` callback where ownership rules are symbolic). In those cases, prefer disabling the
+specific rule as locally as possible, and include a short reason.
+
+```ts
+// eslint-disable-next-line @jax-js/no-use-after-consume -- inside jit(): traced, not executed
+const y = jit((x) => x.add(1))(x);
+```
+
+Disable for a single line:
+
+```ts
+// eslint-disable-next-line @jax-js/require-consume -- intentionally leaked until process exit
+const cached = np.zeros([1024]);
+```
+
+Disable for a small block:
+
+```ts
+/* eslint-disable @jax-js/require-consume -- constructing a global cache */
+const CACHE = new Map();
+function getOrCreate(key) {
+  if (!CACHE.has(key)) CACHE.set(key, np.zeros([3]));
+  return CACHE.get(key);
+}
+/* eslint-enable @jax-js/require-consume */
+```
+
+Or turn a rule off (or change severity) in your ESLint config:
+
+```ts
+import jaxJs from "eslint-plugin-jax-js";
+
+export default [
+  jaxJs.configs.recommended,
+  {
+    rules: {
+      "@jax-js/require-consume": "off",
+    },
+  },
+];
+```
+
 ## Setup
 
 ### Recommended config (all rules as warnings)

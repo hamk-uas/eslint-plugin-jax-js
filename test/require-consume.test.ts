@@ -1,5 +1,6 @@
 import { RuleTester } from "eslint";
 import { describe, it } from "vitest";
+import tsParser from "@typescript-eslint/parser";
 
 import rule from "../src/rules/require-consume";
 
@@ -7,6 +8,14 @@ const ruleTester = new RuleTester({
   languageOptions: {
     ecmaVersion: 2022,
     sourceType: "module",
+  },
+});
+
+const tsRuleTester = new RuleTester({
+  languageOptions: {
+    ecmaVersion: 2022,
+    sourceType: "module",
+    parser: tsParser as any,
   },
 });
 
@@ -314,6 +323,66 @@ y.dispose();
             const y = x.reshape([3, 3]);
             console.log(y.shape);
 y.dispose();
+          `,
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+  });
+
+  it("handles TypeScript wrappers", () => {
+    tsRuleTester.run("require-consume", rule, {
+      valid: [
+        // Casted identifier in property access — treated conservatively as consuming
+        {
+          code: `
+            const x = np.zeros([3]);
+            console.log((x as any).shape);
+          `,
+        },
+      ],
+      invalid: [
+        // Array init wrapped in a TS cast should still be detected
+        {
+          code: `
+            const x = (np.zeros([3]) as any);
+            console.log(x.shape);
+          `,
+          errors: [
+            {
+              messageId: "onlyPropertyAccess",
+              suggestions: [
+                {
+                  messageId: "suggestDispose",
+                  output: `
+            const x = (np.zeros([3]) as any);
+            console.log(x.shape);
+x.dispose();
+          `,
+                },
+              ],
+            },
+          ],
+        },
+        // Non-null assertion wrapper on init
+        {
+          code: `
+            const x = np.zeros([3])!;
+            x.shape;
+          `,
+          errors: [
+            {
+              messageId: "onlyPropertyAccess",
+              suggestions: [
+                {
+                  messageId: "suggestDispose",
+                  output: `
+            const x = np.zeros([3])!;
+            x.shape;
+x.dispose();
           `,
                 },
               ],
