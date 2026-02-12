@@ -94,7 +94,8 @@ Known non-consuming callees (`console.log`, `expect`, etc.)
 are automatically excluded. For your own non-consuming helpers, add a
 `// @jax-borrow` comment.
 
-**Suggestion fix:** Inserts `.ref` at the consuming site.
+**Quick fix:** Offers to insert `.ref` before the consuming call (e.g., `x.add(1)` → `x.ref.add(1)`),
+so the array stays alive for later use.
 
 ```ts
 // ❌ Bad — x is consumed by .add(), then used again
