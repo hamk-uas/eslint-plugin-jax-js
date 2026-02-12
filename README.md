@@ -87,7 +87,8 @@ console.log(x.shape);
 x.dispose();
 ```
 
-**Autofix:** Removes `.ref` from the chain.
+**Autofix:** Removes `.ref` from the chain. Safe because the rule has already
+verified there are no later uses of the variable — the `.ref` is provably a leak.
 
 ### `@jax-js/no-use-after-consume`
 
@@ -104,6 +105,8 @@ are automatically excluded. For your own non-consuming helpers, add a
 
 **Suggestion:** Inserts `.ref` before the consuming call
 (e.g., `x.add(1)` → `x.ref.add(1)`), so the array stays alive for later use.
+Not an autofix because `.ref` is only half the fix — you still need a matching
+`.dispose()`, and only you know where it belongs.
 
 ```ts
 // ❌ Bad — x is consumed by .add(), then used again
@@ -145,7 +148,9 @@ console.log(x.shape);
 x.dispose();
 ```
 
-**Suggestion:** Adds `.dispose()` after last use.
+**Suggestion:** Adds `.dispose()` after last use. Not an autofix because
+detection is heuristic — the variable might not be a jax-js array — and you
+may prefer passing it to a consuming operation instead of disposing.
 
 > **Note:** All three rules include the hint *(Can be ignored inside jit.)* in their
 > messages. See [Design philosophy](#design-philosophy) for why the plugin warns inside
