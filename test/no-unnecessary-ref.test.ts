@@ -63,6 +63,48 @@ describe("no-unnecessary-ref", () => {
             const c = x.sub(w);
           `,
         },
+        // .ref needed because later use is also .ref (multiple consuming chains)
+        {
+          code: `
+            const x = array([1, 2, 3]);
+            const a = x.ref.dataSync();
+            const b = x.ref.dataSync();
+            x.dispose();
+          `,
+        },
+        // .ref needed: first topK consumes, second uses x again
+        {
+          code: `
+            const x = np.array([[3, 1, 4], [1, 5, 9]]);
+            let [v, i] = lax.topK(x.ref, 2);
+            [v, i] = lax.topK(x, 1, 0);
+          `,
+        },
+        // .ref needed: init() consumes params, update() uses it again
+        {
+          code: `
+            const params = np.array([1.0, 2.0]);
+            const state = transform.init(params.ref);
+            const [u, s] = transform.update(updates, state, params);
+          `,
+        },
+        // .ref inside a closure passed to grad — variable captured from outer scope
+        // (closure may be invoked multiple times, .ref keeps array alive)
+        {
+          code: `
+            const L = np.array([[2, 0], [1, 3]]);
+            const f = (b) => lax.linalg.triangularSolve(L.ref, b);
+            const db = grad(f)(b);
+          `,
+        },
+        // .ref inside arrow function capturing outer variable — multi-invocation safety
+        {
+          code: `
+            const a = np.array([[1, 2], [3, 4]]);
+            const f = (b) => np.linalg.lstsq(a.ref, b);
+            const db = grad(f)(b);
+          `,
+        },
         // .ref as return value in a function passed as a callback arg — intentional cloning
         {
           code: `
@@ -198,18 +240,29 @@ describe("no-unnecessary-ref", () => {
           `,
         },
         // .ref followed only by non-consuming .shape access
+        // (no autofix — removing .ref would break later .shape access)
         {
           code: `
             const x = array([1, 2, 3]);
             const y = x.ref.add(z);
             console.log(x.shape);
           `,
-          errors: [{ messageId: "unnecessaryRefOnlyProps" }],
-          output: `
+          errors: [
+            {
+              messageId: "unnecessaryRefOnlyProps",
+              suggestions: [
+                {
+                  messageId: "addDispose",
+                  output: `
             const x = array([1, 2, 3]);
-            const y = x.add(z);
+            const y = x.ref.add(z);
             console.log(x.shape);
+x.dispose();
           `,
+                },
+              ],
+            },
+          ],
         },
       ],
     });

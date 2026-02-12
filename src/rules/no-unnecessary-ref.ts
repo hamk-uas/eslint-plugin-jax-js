@@ -17,6 +17,7 @@ import {
   findVariable,
   isBorrowedBinding,
   isNonConsumingReference,
+  parentOf,
 } from "../shared";
 
 const rule: Rule.RuleModule = {
@@ -28,11 +29,14 @@ const rule: Rule.RuleModule = {
       recommended: true,
     },
     fixable: "code",
+    hasSuggestions: true,
     messages: {
       unnecessaryRef:
         "Unnecessary `.ref` — `{{name}}` is not used after this, so the `.ref` creates a leaked reference. Remove `.ref` to let the operation consume the array directly.",
       unnecessaryRefOnlyProps:
-        "Unnecessary `.ref` — `{{name}}` is only used for non-consuming property access ({{props}}) afterward. Add `.dispose()` or remove `.ref`.",
+        "Unnecessary `.ref` — `{{name}}` is only used for non-consuming property access ({{props}}) afterward. Add `.dispose()` after the last use to avoid a leak.",
+      addDispose:
+        "Add `.dispose()` after the last use of `{{name}}` to fix the leak.",
     },
     schema: [],
   },
@@ -53,6 +57,13 @@ const rule: Rule.RuleModule = {
         // Borrowed bindings (callback params, for-of vars) use `.ref`
         // for intentional cloning — skip.
         if (isBorrowedBinding(variable)) return;
+
+        // If the `.ref` is inside a nested function (closure capturing the
+        // variable from an outer scope), skip. The closure may be invoked
+        // multiple times (e.g., by grad(), jit(), vmap()), and the `.ref`
+        // keeps the captured array alive across invocations.
+        const refScope = sourceCode.getScope(node);
+        if (isClosureCapture(variable.scope, refScope)) return;
 
         const allRefs = variable.references;
         const idx = allRefs.findIndex((r: any) => r.identifier === node.object);
@@ -80,6 +91,24 @@ const rule: Rule.RuleModule = {
           return;
         }
 
+        // If any later reference is itself a `.ref` access, the current
+        // `.ref` is needed — the variable participates in multiple
+        // consuming chains and must survive past each one.
+        for (const ref of after) {
+          if (!ref.isRead()) continue;
+          const parent = parentOf(ref.identifier);
+          if (
+            parent?.type === "MemberExpression" &&
+            (parent as ESTree.MemberExpression).object === ref.identifier &&
+            !(parent as ESTree.MemberExpression).computed &&
+            (parent as ESTree.MemberExpression).property.type === "Identifier" &&
+            ((parent as ESTree.MemberExpression).property as ESTree.Identifier)
+              .name === "ref"
+          ) {
+            return;
+          }
+        }
+
         // Collect non-consuming prop names; bail on any consuming ref.
         const props: string[] = [];
         const allNonConsuming = after.every((ref: any) => {
@@ -93,6 +122,12 @@ const rule: Rule.RuleModule = {
         });
 
         if (allNonConsuming && props.length > 0) {
+          // The `.ref` keeps the array alive for later non-consuming
+          // accesses (.shape, .dtype, etc.). Removing `.ref` would
+          // let the chained operation consume the array, crashing
+          // the later accesses. Report as a warning without autofix;
+          // the real fix is to add `.dispose()` after the last use.
+          const lastReadRef = [...after].reverse().find((r: any) => r.isRead());
           context.report({
             node,
             messageId: "unnecessaryRefOnlyProps",
@@ -100,7 +135,35 @@ const rule: Rule.RuleModule = {
               name: varName,
               props: props.map((p) => `.${p}`).join(", "),
             },
-            fix: (fixer) => removeRef(fixer, node, sourceCode),
+            suggest: lastReadRef
+              ? [
+                  {
+                    messageId: "addDispose",
+                    data: { name: varName },
+                    fix: (fixer) => {
+                      const lastId = lastReadRef.identifier;
+                      const lastParent = parentOf(lastId);
+                      // Find the end of the statement containing the last use.
+                      let stmtNode: ESTree.Node = lastParent ?? lastId;
+                      while (
+                        parentOf(stmtNode) &&
+                        (parentOf(stmtNode) as any).type !== "Program" &&
+                        (parentOf(stmtNode) as any).type !== "BlockStatement"
+                      ) {
+                        stmtNode = parentOf(stmtNode)!;
+                      }
+                      const stmtEnd = stmtNode.range
+                        ? stmtNode.range[1]
+                        : null;
+                      if (stmtEnd === null) return null;
+                      return fixer.insertTextAfterRange(
+                        [stmtEnd, stmtEnd],
+                        `\n${varName}.dispose();`,
+                      );
+                    },
+                  },
+                ]
+              : [],
           });
         }
       },
@@ -119,6 +182,20 @@ function removeRef(
   });
   const ref = dot && sourceCode.getTokenAfter(dot);
   return dot && ref ? fixer.removeRange([dot.range[0], ref.range[1]]) : null;
+}
+
+/**
+ * Check if there is a function scope boundary between the variable's
+ * defining scope and the reference scope. If so, the reference is a
+ * closure capture — the `.ref` may be needed for multi-invocation safety.
+ */
+function isClosureCapture(variableScope: any, refScope: any): boolean {
+  let scope = refScope;
+  while (scope && scope !== variableScope) {
+    if (scope.type === "function") return true;
+    scope = scope.upper;
+  }
+  return false;
 }
 
 export default rule;
