@@ -16,7 +16,7 @@ import type * as ESTree from "estree";
 import {
   findVariable,
   isBorrowedBinding,
-  isNonConsumingReference,
+  NON_CONSUMING_PROPS,
   parentOf,
 } from "../shared";
 
@@ -48,25 +48,39 @@ const rule: Rule.RuleModule = {
       'MemberExpression[property.name="ref"][computed=false]'(
         node: ESTree.MemberExpression,
       ) {
-        if (node.object.type !== "Identifier") return;
+        const target = getTrackedTarget(node.object);
+        if (!target) return;
 
-        const varName = node.object.name;
+        const varName = target.targetPath;
         const variable = findVariable(sourceCode.getScope(node), varName);
-        if (!variable) return;
+        const rootVariable = findVariable(sourceCode.getScope(node), target.rootName);
+        const trackedVariable = variable ?? rootVariable;
+        if (!trackedVariable) return;
 
         // Borrowed bindings (callback params, for-of vars) use `.ref`
         // for intentional cloning — skip.
-        if (isBorrowedBinding(variable)) return;
+        if (isBorrowedBinding(trackedVariable)) return;
 
         // If the `.ref` is inside a nested function (closure capturing the
         // variable from an outer scope), skip. The closure may be invoked
         // multiple times (e.g., by grad(), jit(), vmap()), and the `.ref`
         // keeps the captured array alive across invocations.
         const refScope = sourceCode.getScope(node);
-        if (isClosureCapture(variable.scope, refScope)) return;
+        if (isClosureCapture(trackedVariable.scope, refScope)) return;
 
-        const allRefs = variable.references;
-        const idx = allRefs.findIndex((r: any) => r.identifier === node.object);
+        const allRefs = trackedVariable.references.filter((ref: any) => {
+          const path = getReferencePath(ref.identifier);
+          return (
+            path === target.targetPath ||
+            path.startsWith(`${target.targetPath}.`)
+          );
+        });
+
+        const idx = allRefs.findIndex(
+          (r: any) =>
+            isRefAccessForTarget(r, target.targetPath) &&
+            r.identifier.range?.[0] === target.rootIdentifier.range?.[0],
+        );
         if (idx === -1) return;
 
         // If the variable is consumed BEFORE this `.ref` in source order,
@@ -76,7 +90,9 @@ const rule: Rule.RuleModule = {
         // jax-js uses move semantics — passing an array to any function
         // transfers ownership.
         for (const ref of allRefs.slice(0, idx)) {
-          if (ref.isRead() && !isNonConsumingReference(ref)) return;
+          if (ref.isRead() && !isNonConsumingForTarget(ref, target.targetPath)) {
+            return;
+          }
         }
 
         const after = allRefs.slice(idx + 1);
@@ -96,15 +112,7 @@ const rule: Rule.RuleModule = {
         // consuming chains and must survive past each one.
         for (const ref of after) {
           if (!ref.isRead()) continue;
-          const parent = parentOf(ref.identifier);
-          if (
-            parent?.type === "MemberExpression" &&
-            (parent as ESTree.MemberExpression).object === ref.identifier &&
-            !(parent as ESTree.MemberExpression).computed &&
-            (parent as ESTree.MemberExpression).property.type === "Identifier" &&
-            ((parent as ESTree.MemberExpression).property as ESTree.Identifier)
-              .name === "ref"
-          ) {
+          if (isRefAccessForTarget(ref, target.targetPath)) {
             return;
           }
         }
@@ -113,10 +121,8 @@ const rule: Rule.RuleModule = {
         const props: string[] = [];
         const allNonConsuming = after.every((ref: any) => {
           if (!ref.isRead()) return true;
-          if (!isNonConsumingReference(ref)) return false;
-          const p = (
-            (ref.identifier as any).parent.property as ESTree.Identifier
-          ).name;
+          const p = getFirstPropertyAfterTarget(ref, target.targetPath);
+          if (!p || !NON_CONSUMING_PROPS.has(p)) return false;
           if (!props.includes(p)) props.push(p);
           return true;
         });
@@ -196,6 +202,77 @@ function isClosureCapture(variableScope: any, refScope: any): boolean {
     scope = scope.upper;
   }
   return false;
+}
+
+function getTrackedTarget(node: ESTree.Expression): {
+  rootName: string;
+  rootIdentifier: ESTree.Identifier;
+  targetPath: string;
+} | null {
+  if (node.type === "Identifier") {
+    return {
+      rootName: node.name,
+      rootIdentifier: node,
+      targetPath: node.name,
+    };
+  }
+
+  if (node.type !== "MemberExpression") return null;
+
+  const parts: string[] = [];
+  let current: ESTree.Expression = node;
+  while (current.type === "MemberExpression") {
+    if (current.computed || current.property.type !== "Identifier") return null;
+    parts.unshift(current.property.name);
+    current = current.object;
+  }
+
+  if (current.type !== "Identifier") return null;
+  return {
+    rootName: current.name,
+    rootIdentifier: current,
+    targetPath: [current.name, ...parts].join("."),
+  };
+}
+
+function getReferencePath(identifier: ESTree.Identifier): string {
+  let current: ESTree.Node = identifier;
+  const parts = [identifier.name];
+
+  while (true) {
+    const parent = parentOf(current);
+    if (
+      parent?.type === "MemberExpression" &&
+      parent.object === current &&
+      !parent.computed &&
+      parent.property.type === "Identifier"
+    ) {
+      parts.push(parent.property.name);
+      current = parent;
+      continue;
+    }
+    break;
+  }
+
+  return parts.join(".");
+}
+
+function getFirstPropertyAfterTarget(ref: any, targetPath: string): string | null {
+  const refPath = getReferencePath(ref.identifier);
+  if (!refPath.startsWith(`${targetPath}.`)) return null;
+  const suffix = refPath.slice(targetPath.length + 1);
+  if (!suffix) return null;
+  const [first] = suffix.split(".");
+  return first ?? null;
+}
+
+function isNonConsumingForTarget(ref: any, targetPath: string): boolean {
+  const firstProp = getFirstPropertyAfterTarget(ref, targetPath);
+  return firstProp ? NON_CONSUMING_PROPS.has(firstProp) : false;
+}
+
+function isRefAccessForTarget(ref: any, targetPath: string): boolean {
+  return getFirstPropertyAfterTarget(ref, targetPath) === "ref";
 }
 
 export default rule;

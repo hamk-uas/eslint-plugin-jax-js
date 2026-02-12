@@ -264,6 +264,47 @@ x.dispose();
             },
           ],
         },
+        // Fixed-point regression: report all unnecessary `.ref` in object-member chains
+        {
+          code: `
+            const fwd = {
+              x_pred: array([1]),
+              C_pred: array([1]),
+              K: array([1]),
+              v: array([1]),
+              Cp: array([1]),
+            };
+            const out = {
+              x_pred: np.flip(fwd.x_pred.ref, 0),
+              C_pred: np.flip(fwd.C_pred.ref, 0),
+              K: np.flip(fwd.K, 0),
+              v: np.flip(fwd.v.ref, 0),
+              Cp: np.flip(fwd.Cp.ref, 0),
+            };
+          `,
+          errors: [
+            { messageId: "unnecessaryRef" },
+            { messageId: "unnecessaryRef" },
+            { messageId: "unnecessaryRef" },
+            { messageId: "unnecessaryRef" },
+          ],
+          output: `
+            const fwd = {
+              x_pred: array([1]),
+              C_pred: array([1]),
+              K: array([1]),
+              v: array([1]),
+              Cp: array([1]),
+            };
+            const out = {
+              x_pred: np.flip(fwd.x_pred, 0),
+              C_pred: np.flip(fwd.C_pred, 0),
+              K: np.flip(fwd.K, 0),
+              v: np.flip(fwd.v, 0),
+              Cp: np.flip(fwd.Cp, 0),
+            };
+          `,
+        },
       ],
     });
   });
