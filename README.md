@@ -10,8 +10,10 @@ red squiggles in your editor instead of discovering leaks at runtime with `check
 ## Installation
 
 ```bash
-npm install --save-dev @hamk-uas/eslint-plugin-jax-js
+npm install --save-dev github:hamk-uas/eslint-plugin-jax-js#v0.1.0
 ```
+
+Replace `v0.1.0` with the [latest release tag](https://github.com/hamk-uas/eslint-plugin-jax-js/releases).
 
 The plugin requires **ESLint v9+** (flat config).
 
@@ -356,10 +358,10 @@ npm install --save-dev github:hamk-uas/eslint-plugin-jax-js#my-fix-branch
 Both methods make ESLint use the development version immediately. Since the plugin
 ships raw TypeScript (loaded via ESLint's `jiti` transpiler), no build step is needed.
 
-Once the fix is published to npm, switch back:
+Once the fix is released, switch back to the tagged version:
 
 ```bash
-npm install --save-dev @hamk-uas/eslint-plugin-jax-js@latest
+npm install --save-dev github:hamk-uas/eslint-plugin-jax-js#v0.1.1
 ```
 
 ### Fixing bugs
@@ -388,14 +390,13 @@ npm install --save-dev @hamk-uas/eslint-plugin-jax-js@latest
 
 ## Maintainer Guide
 
-This section is for maintainers who publish releases to npm.
+This section is for maintainers who create releases.
 
 ### Releasing a bug fix
 
 1. Merge the PR with the fix.
-2. **Version** — bug fixes are always a **patch** bump (`npm version patch`). Remember to
-   update the version string in `src/index.ts` to match.
-3. **Publish** — follow the [publishing steps](#publishing) below.
+2. **Version & tag** — bug fixes are always a **patch** bump. See [releasing](#releasing) below.
+3. **Create a GitHub release** with notes describing the fix.
 
 ### Updating for a New jax-js Version
 
@@ -447,17 +448,11 @@ In `package.json`, widen or bump the `@jax-js/jax` peer dependency range:
 If new methods introduce novel consuming/non-consuming behaviors, add test cases to the
 relevant test files in `test/`.
 
-#### 6. Bump version and publish
+#### 6. Bump version and release
 
-Follow the publishing steps below.
+Follow the releasing steps below.
 
-### Publishing
-
-#### Prerequisites
-
-- [Node.js](https://nodejs.org/) (v18+) and npm.
-- An [npm account](https://www.npmjs.com/signup) with publish access to `@hamk-uas/eslint-plugin-jax-js`.
-- Authenticated locally: `npm login`.
+### Releasing
 
 #### Steps
 
@@ -468,18 +463,21 @@ npx tsc --noEmit
 
 # 2. Bump the version (choose patch / minor / major as appropriate)
 npm version patch   # e.g., 0.1.0 → 0.1.1
-# This updates package.json and creates a git tag.
+# This updates package.json and creates a git tag (v0.1.1).
 # Remember to also update the version string in src/index.ts to match.
 
 # 3. Push the commit and tag
 git push && git push --tags
 
-# 4. Publish to npm
-npm publish
-
-# 5. (Optional) Create a GitHub release
+# 4. Create a GitHub release
 #    Go to https://github.com/hamk-uas/eslint-plugin-jax-js/releases/new
 #    Select the tag, write release notes summarizing changes.
+```
+
+Users install specific tags, so after releasing they can upgrade with:
+
+```bash
+npm install --save-dev github:hamk-uas/eslint-plugin-jax-js#v0.1.1
 ```
 
 #### Version numbering
@@ -490,6 +488,12 @@ npm publish
 | New jax-js methods added to API surface | **patch** |
 | New lint rule or rule behavior change | **minor** |
 | Breaking: removed rule, changed defaults, ownership model change | **major** |
+
+#### Future: npm publishing
+
+If the user base grows, consider publishing to the npm registry for easier version
+management. The package.json is already set up for scoped publishing — just add
+`"publishConfig": { "access": "public" }` back, run `npm login`, and `npm publish`.
 
 ## License
 
