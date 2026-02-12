@@ -355,6 +355,33 @@ This runs tests and type-checking before every commit. The hook lives in
 - If a fix changes user-visible behavior (e.g., a rule now warns in a case it previously
   allowed), mention it in the GitHub release notes so users know what to expect.
 
+#### Testing a fix in your own project
+
+If you notice a bug while using the plugin in another project, you can point that
+project at your local clone or development branch without waiting for a published release.
+
+**From a local clone:**
+
+```bash
+# In your project (not the plugin repo):
+npm install --save-dev /path/to/jax-js-eslint-plugin
+```
+
+**From a git branch (e.g., a PR branch):**
+
+```bash
+npm install --save-dev github:hamk-uas/eslint-plugin-jax-js#my-fix-branch
+```
+
+Both methods make ESLint use the development version immediately. Since the plugin
+ships raw TypeScript (loaded via ESLint's `jiti` transpiler), no build step is needed.
+
+Once the fix is published to npm, switch back:
+
+```bash
+npm install --save-dev eslint-plugin-jax-js@latest
+```
+
 ### Updating for a New jax-js Version
 
 When a new version of [jax-js](https://github.com/ekzhang/jax-js) is released, follow these steps
