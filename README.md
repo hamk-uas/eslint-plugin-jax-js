@@ -322,8 +322,8 @@ Optional settings for a better experience (add to `.vscode/settings.json`):
 
 ```jsonc
 {
-  // Lint on save for fast feedback
-  "eslint.run": "onSave",
+  // Lint as you type for immediate feedback (use "onSave" if you prefer less frequent diagnostics)
+  "eslint.run": "onType",
 
   // Validate TypeScript and JavaScript files
   "eslint.validate": ["typescript", "javascript"],
