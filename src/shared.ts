@@ -1,5 +1,5 @@
 /**
- * Shared utilities and constant sets for eslint-plugin-jax-js rules.
+ * Shared utilities and constant sets for @hamk-uas/eslint-plugin-jax-js rules.
  *
  * Most sets are derived from the API surface file (api-surface.generated.ts).
  * Update that file when jax-js adds new methods or getters.

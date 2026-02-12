@@ -1,6 +1,6 @@
-# eslint-plugin-jax-js
+# @hamk-uas/eslint-plugin-jax-js
 
-ESLint rules for catching **array memory leaks** in [jax-js](https://github.com/ekzhang/jax-js) applications at edit time.
+Community ESLint plugin for catching **array memory leaks** in [jax-js](https://github.com/ekzhang/jax-js) applications at edit time. Not affiliated with or endorsed by the jax-js project.
 
 jax-js uses a consuming ownership model: most operations dispose their input arrays automatically.
 If you create an array and never pass it to an operation or call `.dispose()`, the underlying
@@ -10,7 +10,7 @@ red squiggles in your editor instead of discovering leaks at runtime with `check
 ## Installation
 
 ```bash
-npm install --save-dev eslint-plugin-jax-js
+npm install --save-dev @hamk-uas/eslint-plugin-jax-js
 ```
 
 The plugin requires **ESLint v9+** (flat config).
@@ -116,7 +116,7 @@ function getOrCreate(key) {
 Or turn a rule off (or change severity) in your ESLint config:
 
 ```ts
-import jaxJs from "eslint-plugin-jax-js";
+import jaxJs from "@hamk-uas/eslint-plugin-jax-js";
 
 export default [
   jaxJs.configs.recommended,
@@ -136,7 +136,7 @@ Add the plugin to your flat ESLint config:
 
 ```ts
 // eslint.config.ts (or eslint.config.js)
-import jaxJs from "eslint-plugin-jax-js";
+import jaxJs from "@hamk-uas/eslint-plugin-jax-js";
 
 export default [
   // ... your other config
@@ -149,7 +149,7 @@ export default [
 Or enable rules individually:
 
 ```ts
-import jaxJs from "eslint-plugin-jax-js";
+import jaxJs from "@hamk-uas/eslint-plugin-jax-js";
 
 export default [
   {
@@ -168,7 +168,7 @@ export default [
 If your project mixes jax-js code with other code, you can scope the rules to specific directories:
 
 ```ts
-import jaxJs from "eslint-plugin-jax-js";
+import jaxJs from "@hamk-uas/eslint-plugin-jax-js";
 
 export default [
   {
@@ -210,7 +210,7 @@ Optional settings for a better experience (add to `.vscode/settings.json`):
 1. Go to **Settings → Languages & Frameworks → JavaScript → Code Quality Tools → ESLint**.
 2. Select **Automatic ESLint configuration** (or point to your config manually).
 3. Check **Run eslint --fix on save** if you want autofixes applied automatically.
-4. Warnings from `eslint-plugin-jax-js` will appear inline in the editor.
+4. Warnings from `@hamk-uas/eslint-plugin-jax-js` will appear inline in the editor.
 
 ### Neovim
 
@@ -257,7 +257,7 @@ messages include the hint *"Can be ignored inside jit."*).
 To enable it in the jax-js monorepo, add to the root `eslint.config.ts`:
 
 ```ts
-import jaxJs from "eslint-plugin-jax-js";
+import jaxJs from "@hamk-uas/eslint-plugin-jax-js";
 
 export default defineConfig([
   // ...existing config
@@ -352,7 +352,7 @@ ships raw TypeScript (loaded via ESLint's `jiti` transpiler), no build step is n
 Once the fix is published to npm, switch back:
 
 ```bash
-npm install --save-dev eslint-plugin-jax-js@latest
+npm install --save-dev @hamk-uas/eslint-plugin-jax-js@latest
 ```
 
 ## Maintainer Guide
@@ -446,7 +446,7 @@ Follow the publishing steps below.
 #### Prerequisites
 
 - [Node.js](https://nodejs.org/) (v18+) and npm.
-- An [npm account](https://www.npmjs.com/signup) with publish access to `eslint-plugin-jax-js`.
+- An [npm account](https://www.npmjs.com/signup) with publish access to `@hamk-uas/eslint-plugin-jax-js`.
 - Authenticated locally: `npm login`.
 
 #### Steps
