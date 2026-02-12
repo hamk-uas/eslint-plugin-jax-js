@@ -72,9 +72,10 @@ const data = x.ref.dataSync();
 const x = np.array([1, 2, 3]);
 const data = x.dataSync();
 
-// ✅ Good — x.ref is needed because x is used again later
+// ✅ Good — x.ref is needed because x is used meaningfully afterward
 const x = np.array([1, 2, 3]);
 const data = x.ref.dataSync();
+console.log(x.shape);
 x.dispose();
 ```
 
