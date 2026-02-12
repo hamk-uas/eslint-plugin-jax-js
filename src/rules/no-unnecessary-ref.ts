@@ -204,11 +204,13 @@ function isClosureCapture(variableScope: any, refScope: any): boolean {
   return false;
 }
 
-function getTrackedTarget(node: ESTree.Expression): {
+function getTrackedTarget(node: ESTree.Expression | ESTree.Super): {
   rootName: string;
   rootIdentifier: ESTree.Identifier;
   targetPath: string;
 } | null {
+  if (node.type === "Super") return null;
+
   if (node.type === "Identifier") {
     return {
       rootName: node.name,
@@ -220,7 +222,7 @@ function getTrackedTarget(node: ESTree.Expression): {
   if (node.type !== "MemberExpression") return null;
 
   const parts: string[] = [];
-  let current: ESTree.Expression = node;
+  let current: ESTree.Expression | ESTree.Super = node;
   while (current.type === "MemberExpression") {
     if (current.computed || current.property.type !== "Identifier") return null;
     parts.unshift(current.property.name);
