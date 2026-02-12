@@ -312,6 +312,37 @@ If jax-js adds new methods, update `src/api-surface.generated.ts` accordingly.
 This section is for maintainers of the plugin itself — if you're just using the plugin
 in your project, you can stop reading here.
 
+### Bug Fixes
+
+#### Workflow
+
+1. **Reproduce** — add a failing test case to the relevant file in `test/`. Each test
+   file uses ESLint's `RuleTester`, so a new entry in `valid` or `invalid` is usually
+   enough to capture the bug.
+2. **Fix** — the rules live in `src/rules/`. Shared detection logic (array-init heuristics,
+   scope helpers, consuming-site detection) is in `src/shared.ts`.
+3. **Verify** — run `npm test` and `npx tsc --noEmit` to confirm the fix and catch regressions.
+4. **Version** — bug fixes are always a **patch** bump (`npm version patch`). Remember to
+   update the version string in `src/index.ts` to match.
+5. **Publish** — follow the [publishing steps](#publishing) below.
+
+#### Common bug categories
+
+| Symptom | Likely location |
+|---------|-----------------|
+| False positive (warning on valid code) | The rule is too aggressive — check the consuming/non-consuming classification in `shared.ts` or the rule's visitor logic. |
+| False negative (no warning on buggy code) | The pattern isn't recognized — likely missing from `isArrayInit()`, factory/method sets, or the namespace list. |
+| Wrong autofix / suggestion | The `fix` or `suggest` callback in the rule — test the `output` field in `RuleTester`. |
+| Crash / exception in the rule | Usually a missing null-check on an AST node — add a guard and a regression test. |
+
+#### Tips
+
+- **Keep test-first discipline** — always add the failing test *before* writing the fix.
+  This ensures the bug is actually reproduced and prevents regressions.
+- **One fix, one patch** — avoid bundling unrelated changes into a bug-fix release.
+- If a fix changes user-visible behavior (e.g., a rule now warns in a case it previously
+  allowed), mention it in the GitHub release notes so users know what to expect.
+
 ### Updating for a New jax-js Version
 
 When a new version of [jax-js](https://github.com/ekzhang/jax-js) is released, follow these steps
