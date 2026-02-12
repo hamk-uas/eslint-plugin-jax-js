@@ -135,6 +135,110 @@ describe("no-use-after-consume", () => {
             }
           `,
         },
+
+        // Else-branch termination: consumed in else that returns
+        {
+          code: `
+            function f() {
+              const x = np.zeros([3]);
+              if (cond) {
+                // do nothing
+              } else {
+                return x.reshape([1, 3]);
+              }
+              x.add(1);
+            }
+          `,
+        },
+
+        // Else-branch termination with throw
+        {
+          code: `
+            function f() {
+              const x = np.zeros([3]);
+              if (err) {
+                // skip
+              } else {
+                throw x.dispose();
+              }
+              x.reshape([3, 1]);
+            }
+          `,
+        },
+
+        // Ternary expression — consumption in one branch doesn't affect after
+        {
+          code: `
+            const x = np.zeros([3]);
+            const y = cond ? x.add(1) : other;
+            x.dispose();
+          `,
+        },
+
+        // Logical OR short-circuit — right side may not execute
+        {
+          code: `
+            const x = np.zeros([3]);
+            const y = fallback || x.add(1);
+            x.dispose();
+          `,
+        },
+
+        // Logical AND short-circuit — right side may not execute
+        {
+          code: `
+            const x = np.zeros([3]);
+            const y = cond && x.reshape([1, 3]);
+            x.dispose();
+          `,
+        },
+
+        // Nullish coalescing — right side may not execute
+        {
+          code: `
+            const x = np.zeros([3]);
+            const y = prev ?? x.add(1);
+            x.dispose();
+          `,
+        },
+
+        // Expression evaluation order: x.reshape([...x.shape])
+        // Arguments are evaluated before the method call,
+        // so x.shape is read while x is still alive.
+        {
+          code: `
+            const x = np.zeros([3]);
+            x.reshape([1, ...x.shape]);
+          `,
+        },
+
+        // Expression evaluation order: accessing property in args of consuming call
+        {
+          code: `
+            const x = np.zeros([3]);
+            const y = x.reshape([x.shape[0], 1]);
+          `,
+        },
+
+        // Expression evaluation order: kind:'argument' — np.multiply(x, x.shape)
+        // All arguments are evaluated before the function call, so x.shape
+        // is read while x is still alive.
+        "const x = np.zeros([3]); foo(x, x.shape);",
+
+        // Loop with consume-and-reassign — safe pattern
+        "let x = np.zeros([3]); while (cond) { x = x.add(1); } x.dispose();",
+
+        // JSON.stringify is safe-listed
+        "const x = np.zeros([3]); JSON.stringify(x); x.dispose();",
+
+        // Array.isArray is safe-listed
+        "const x = np.zeros([3]); Array.isArray(x); x.dispose();",
+
+        // Math.min is safe-listed
+        "const x = np.zeros([3]); Math.min(x); x.dispose();",
+
+        // Boolean() is safe-listed
+        "const x = np.zeros([3]); Boolean(x); x.dispose();",
       ],
 
       invalid: [
@@ -339,6 +443,115 @@ describe("no-use-after-consume", () => {
                 {
                   messageId: "suggestRef",
                   output: "const x = np.zeros([3]); x.ref.dispose(); foo(x);",
+                },
+              ],
+            },
+          ],
+        },
+
+        // Ternary: both branches consume, then use after — still flagged
+        // because the variable IS definitely consumed by one branch or the other.
+        {
+          code: "const x = np.zeros([3]); cond ? x.add(1) : x.sub(1); x.shape;",
+          errors: [
+            {
+              messageId: "useAfterConsume",
+              suggestions: [
+                {
+                  messageId: "suggestRef",
+                  output:
+                    "const x = np.zeros([3]); cond ? x.add(1) : x.ref.sub(1); x.shape;",
+                },
+              ],
+            },
+          ],
+        },
+
+        // Ternary: both branches consume, use .shape after — flagged
+        {
+          code: [
+            "const x = np.zeros([3]);",
+            "const y = cond ? x.add(1) : x.mul(2);",
+            "console.log(x.shape);",
+          ].join("\n"),
+          errors: [
+            {
+              messageId: "useAfterConsume",
+              suggestions: [
+                {
+                  messageId: "suggestRef",
+                  output: [
+                    "const x = np.zeros([3]);",
+                    "const y = cond ? x.add(1) : x.ref.mul(2);",
+                    "console.log(x.shape);",
+                  ].join("\n"),
+                },
+              ],
+            },
+          ],
+        },
+
+        // Use after consuming method with safe callee between
+        // (safe callee doesn't reset consumption)
+        {
+          code: "const x = np.zeros([3]); x.add(1); console.log(x); x.shape;",
+          errors: [
+            {
+              messageId: "useAfterConsume",
+              suggestions: [
+                {
+                  messageId: "suggestRef",
+                  output:
+                    "const x = np.zeros([3]); x.ref.add(1); console.log(x); x.shape;",
+                },
+              ],
+            },
+            {
+              messageId: "useAfterConsume",
+              suggestions: [
+                {
+                  messageId: "suggestRef",
+                  output:
+                    "const x = np.zeros([3]); x.ref.add(1); console.log(x); x.shape;",
+                },
+              ],
+            },
+          ],
+        },
+
+        // Loop without reassignment — genuine use-after-consume every iteration
+        {
+          code: "const x = np.zeros([3]); while (cond) { x.add(1); x.shape; }",
+          errors: [
+            {
+              messageId: "useAfterConsume",
+              suggestions: [
+                {
+                  messageId: "suggestRef",
+                  output:
+                    "const x = np.zeros([3]); while (cond) { x.ref.add(1); x.shape; }",
+                },
+              ],
+            },
+          ],
+        },
+
+        // Loop with write AFTER use — write doesn't help current iteration
+        {
+          code: [
+            "let x = np.zeros([3]);",
+            "while (cond) { x.add(1); x.shape; x = np.zeros([3]); }",
+          ].join("\n"),
+          errors: [
+            {
+              messageId: "useAfterConsume",
+              suggestions: [
+                {
+                  messageId: "suggestRef",
+                  output: [
+                    "let x = np.zeros([3]);",
+                    "while (cond) { x.ref.add(1); x.shape; x = np.zeros([3]); }",
+                  ].join("\n"),
                 },
               ],
             },

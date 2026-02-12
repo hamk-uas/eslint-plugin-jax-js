@@ -43,22 +43,49 @@ import {
  *
  * console — logging/debugging (console.log, console.warn, etc.)
  * assert  — Node.js assert module (assert.deepEqual, assert.ok, etc.)
+ * JSON    — JSON.stringify / JSON.parse (serialization)
+ * Object  — Object.keys, Object.values, Object.entries, etc.
+ * Array   — Array.isArray, Array.from (introspection/conversion)
+ * Math    — Math.min, Math.max, etc. (numeric, not array-consuming)
  */
-const SAFE_CALLEE_OBJECTS = new Set<string>(["console", "assert"]);
+const SAFE_CALLEE_OBJECTS = new Set<string>([
+  "console",
+  "assert",
+  "JSON",
+  "Object",
+  "Array",
+  "Math",
+]);
 
 /**
  * Bare function names (`func(x)`) known not to consume jax arrays.
  *
- * expect — vitest/jest assertion entry point (expect(x).toBeDefined())
- * assert — Node.js assert() or chai assert()
- * String — type coercion, calls toString()
- * Number — type coercion for scalar arrays
+ * expect    — vitest/jest assertion entry point (expect(x).toBeDefined())
+ * assert    — Node.js assert() or chai assert()
+ * String    — type coercion, calls toString()
+ * Number    — type coercion for scalar arrays
+ * Boolean   — type coercion
+ * parseInt  — numeric conversion
+ * parseFloat — numeric conversion
+ * isNaN     — numeric check
+ * isFinite  — numeric check
+ * describe  — test framework
+ * it        — test framework
+ * test      — test framework
  */
 const SAFE_CALLEE_NAMES = new Set<string>([
   "expect",
   "assert",
   "String",
   "Number",
+  "Boolean",
+  "parseInt",
+  "parseFloat",
+  "isNaN",
+  "isFinite",
+  "describe",
+  "it",
+  "test",
 ]);
 
 /** Is the callee known not to consume jax arrays? */
@@ -169,6 +196,215 @@ function getConsumingSite(identifier: ESTree.Identifier): ConsumingSite | null {
   return null;
 }
 
+/**
+ * Check if two nodes are in mutually exclusive branches of the same
+ * conditional or logical expression. For example, in `cond ? a : b`,
+ * `a` and `b` are mutually exclusive.
+ */
+function areInMutuallyExclusiveBranches(
+  node1: ESTree.Node,
+  node2: ESTree.Node,
+): boolean {
+  // Find the common conditional ancestor
+  const cond1 = getConditionalAncestor(node1);
+  const cond2 = getConditionalAncestor(node2);
+  if (!cond1 || !cond2 || cond1 !== cond2) return false;
+
+  if (cond1.type === "ConditionalExpression") {
+    const inConsequent1 = isDescendantOf(node1, cond1.consequent);
+    const inAlternate1 = isDescendantOf(node1, cond1.alternate);
+    const inConsequent2 = isDescendantOf(node2, cond1.consequent);
+    const inAlternate2 = isDescendantOf(node2, cond1.alternate);
+    // One in consequent, other in alternate
+    return (inConsequent1 && inAlternate2) || (inAlternate1 && inConsequent2);
+  }
+
+  // For logical expressions (&&, ||, ??), both operands (left/right) where
+  // right is the short-circuited branch. If both are in the right operand,
+  // they'll both execute or neither will — they're NOT mutually exclusive.
+  // But consumption in left and reference in right are sequential, not exclusive.
+  return false;
+}
+
+/**
+ * Check if `node` is a descendant of (or equal to) `ancestor`.
+ */
+function isDescendantOf(node: ESTree.Node, ancestor: ESTree.Node): boolean {
+  let current: ESTree.Node | undefined = node;
+  while (current) {
+    if (current === ancestor) return true;
+    current = parentOf(current);
+  }
+  return false;
+}
+
+// ---------------------------------------------------------------------------
+// Expression evaluation order detection
+// ---------------------------------------------------------------------------
+
+/**
+ * Check if `refNode` appears inside the arguments of a call expression
+ * where the callee is a method on the SAME variable being consumed.
+ *
+ * Example: `ret.reshape([1, ...ret.shape])`
+ * Here `ret.shape` is inside the arguments of `ret.reshape(...)`.
+ * JS evaluates arguments before the method call, so `ret.shape` is
+ * read while `ret` is still alive. This is NOT a use-after-consume.
+ *
+ * @param refNode — the identifier node of the reference being checked
+ * @param consumingSite — the consuming site that already consumed the variable
+ */
+function isInArgumentsOfSameConsumingCall(
+  refNode: ESTree.Identifier,
+  consumingSite: ConsumingSite,
+): boolean {
+  const consumingIdent = consumingSite.identifier;
+  let callExpr: ESTree.Node | undefined;
+
+  if (consumingSite.kind === "method") {
+    // x.method(...) — ident → MemberExpression → CallExpression
+    const memberExpr = parentOf(consumingIdent);
+    if (!memberExpr || memberExpr.type !== "MemberExpression") return false;
+    callExpr = parentOf(memberExpr);
+  } else if (consumingSite.kind === "argument") {
+    // np.func(x, ...) — ident is a direct argument of a CallExpression
+    callExpr = parentOf(consumingIdent);
+  } else {
+    return false;
+  }
+
+  if (!callExpr || callExpr.type !== "CallExpression") return false;
+
+  // Check if refNode is a descendant of one of the arguments of that call.
+  return isDescendantOfArguments(refNode, callExpr as ESTree.CallExpression);
+}
+
+/**
+ * Check if a node is a descendant of any argument in a CallExpression.
+ */
+function isDescendantOfArguments(
+  node: ESTree.Node,
+  call: ESTree.CallExpression,
+): boolean {
+  let current: ESTree.Node | undefined = node;
+  while (current) {
+    if ((call.arguments as ESTree.Node[]).includes(current)) return true;
+    current = parentOf(current);
+    if (current === call) return false; // Reached the call without matching an arg
+  }
+  return false;
+}
+
+// ---------------------------------------------------------------------------
+// Conditional / ternary / logical expression detection
+// ---------------------------------------------------------------------------
+
+/**
+ * Check if the consuming identifier is inside a conditional branch
+ * (ternary, logical &&/||/??, or if-else) that might not execute.
+ *
+ * If consumption is inside:
+ *   - A ternary consequent/alternate → only one branch runs
+ *   - An `&&` / `||` / `??` right operand → short-circuit may skip it
+ *
+ * Returns the outermost conditional expression node if detected, null otherwise.
+ */
+function getConditionalAncestor(
+  node: ESTree.Node,
+): ESTree.ConditionalExpression | ESTree.LogicalExpression | null {
+  let current: ESTree.Node = node;
+  let parent = parentOf(current);
+  while (parent) {
+    if (parent.type === "ConditionalExpression") {
+      const cond = parent as ESTree.ConditionalExpression;
+      // Only if the consuming node is in the consequent or alternate, not the test
+      if (current === cond.consequent || current === cond.alternate) {
+        return cond;
+      }
+    }
+    if (parent.type === "LogicalExpression") {
+      const logical = parent as ESTree.LogicalExpression;
+      // Only if the consuming node is in the right operand (short-circuited)
+      if (current === logical.right) {
+        return logical;
+      }
+    }
+    // Stop at statement boundaries
+    if (
+      parent.type === "ExpressionStatement" ||
+      parent.type === "VariableDeclaration" ||
+      parent.type === "ReturnStatement" ||
+      parent.type === "ArrowFunctionExpression" ||
+      parent.type === "FunctionExpression" ||
+      parent.type === "FunctionDeclaration"
+    ) {
+      break;
+    }
+    current = parent;
+    parent = parentOf(current);
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Loop detection
+// ---------------------------------------------------------------------------
+
+/**
+ * Check if a node is inside the body of a loop statement (for, while,
+ * do-while, for-of, for-in).
+ *
+ * Consumption inside a loop body should NOT be treated as definitely
+ * consuming for the entire scope — the variable may be alive at loop
+ * start (first iteration) and code after the loop.
+ *
+ * Returns the loop node if found, null otherwise.
+ */
+function getEnclosingLoop(
+  node: ESTree.Node,
+): ESTree.Node | null {
+  let current: ESTree.Node = node;
+  let parent = parentOf(current);
+  while (parent) {
+    if (
+      (parent.type === "ForStatement" && current === (parent as ESTree.ForStatement).body) ||
+      (parent.type === "WhileStatement" && current === (parent as ESTree.WhileStatement).body) ||
+      (parent.type === "DoWhileStatement" && current === (parent as ESTree.DoWhileStatement).body) ||
+      (parent.type === "ForOfStatement" && current === (parent as ESTree.ForOfStatement).body) ||
+      (parent.type === "ForInStatement" && current === (parent as ESTree.ForInStatement).body)
+    ) {
+      return parent;
+    }
+    // Blocks that are the body of loops
+    if (parent.type === "BlockStatement") {
+      const gp = parentOf(parent);
+      if (
+        gp &&
+        (
+          (gp.type === "ForStatement" && (gp as ESTree.ForStatement).body === parent) ||
+          (gp.type === "WhileStatement" && (gp as ESTree.WhileStatement).body === parent) ||
+          (gp.type === "DoWhileStatement" && (gp as ESTree.DoWhileStatement).body === parent) ||
+          (gp.type === "ForOfStatement" && (gp as ESTree.ForOfStatement).body === parent) ||
+          (gp.type === "ForInStatement" && (gp as ESTree.ForInStatement).body === parent)
+        )
+      ) {
+        return gp;
+      }
+    }
+    // Stop at function boundaries
+    if (
+      parent.type === "ArrowFunctionExpression" ||
+      parent.type === "FunctionExpression" ||
+      parent.type === "FunctionDeclaration"
+    ) {
+      break;
+    }
+    current = parent;
+    parent = parentOf(current);
+  }
+  return null;
+}
+
 // ---------------------------------------------------------------------------
 // Scope helpers
 // ---------------------------------------------------------------------------
@@ -194,12 +430,16 @@ function isInNestedFunction(ref: any, variable: any): boolean {
 // ---------------------------------------------------------------------------
 
 /**
- * If `node` is inside the consequent of an `if` whose body definitely
- * terminates (return / throw / continue / break), return the IfStatement.
- * Otherwise return null.
+ * If `node` is inside the consequent OR alternate of an `if` whose
+ * branch definitely terminates (return / throw / continue / break),
+ * return the IfStatement. Otherwise return null.
  *
  * This lets us reset consumption tracking after the `if`, since the code
  * following the `if` is a mutually exclusive branch.
+ *
+ * Handles both:
+ *   - Consumption in then-branch that terminates → code after if is safe
+ *   - Consumption in else-branch that terminates → code after if is safe
  */
 function getTerminatingIfAncestor(
   node: ESTree.Node,
@@ -207,21 +447,28 @@ function getTerminatingIfAncestor(
   let current: ESTree.Node = node;
   let parent = parentOf(current);
   while (parent) {
-    // We only care about the consequent (then-branch), not the alternate.
-    if (
-      parent.type === "IfStatement" &&
-      (parent as ESTree.IfStatement).consequent === current
-    ) {
-      if (blockTerminates(current)) return parent as ESTree.IfStatement;
+    if (parent.type === "IfStatement") {
+      const ifStmt = parent as ESTree.IfStatement;
+      // Check if consumption is in the consequent (then-branch)
+      if (ifStmt.consequent === current && blockTerminates(current)) {
+        return ifStmt;
+      }
+      // Check if consumption is in the alternate (else-branch)
+      if (ifStmt.alternate === current && blockTerminates(current)) {
+        return ifStmt;
+      }
     }
-    // Also handle: direct child of a BlockStatement that is the consequent
+    // Also handle: direct child of a BlockStatement that is the consequent/alternate
     if (parent.type === "BlockStatement") {
       const gp = parentOf(parent);
-      if (
-        gp?.type === "IfStatement" &&
-        (gp as ESTree.IfStatement).consequent === parent
-      ) {
-        if (blockTerminates(parent)) return gp as ESTree.IfStatement;
+      if (gp?.type === "IfStatement") {
+        const ifStmt = gp as ESTree.IfStatement;
+        if (ifStmt.consequent === parent && blockTerminates(parent)) {
+          return ifStmt;
+        }
+        if (ifStmt.alternate === parent && blockTerminates(parent)) {
+          return ifStmt;
+        }
       }
     }
     // Stop at function boundaries.
@@ -367,12 +614,18 @@ const rule: Rule.RuleModule = {
         let consumedBy: ConsumingSite | null = null;
         /** If the consuming site is inside a terminating if-branch, track the IfStatement. */
         let consumedInIf: ESTree.IfStatement | null = null;
+        /** If the consuming site is inside a conditional expression, track it. */
+        let consumedInConditional: ESTree.ConditionalExpression | ESTree.LogicalExpression | null = null;
+        /** If the consuming site is inside a loop body, track the loop. */
+        let consumedInLoop: ESTree.Node | null = null;
 
         for (const ref of refs) {
           // Write reference (reassignment) resets consumption tracking.
           if ((ref as any).isWrite()) {
             consumedBy = null;
             consumedInIf = null;
+            consumedInConditional = null;
+            consumedInLoop = null;
             continue;
           }
 
@@ -388,8 +641,73 @@ const rule: Rule.RuleModule = {
               if (refStart >= ifEnd) {
                 consumedBy = null;
                 consumedInIf = null;
+                consumedInConditional = null;
+                consumedInLoop = null;
                 // Fall through to re-evaluate this ref as a potential consuming site.
               }
+            }
+
+            // If the consuming site was inside a conditional expression
+            // (ternary or logical), and this reference is AFTER it,
+            // the consumption might not have occurred — reset.
+            if (consumedBy !== null && consumedInConditional) {
+              const condEnd = consumedInConditional.range?.[1] ?? 0;
+              const refStart = ref.identifier.range?.[0] ?? 0;
+              if (refStart >= condEnd) {
+                consumedBy = null;
+                consumedInConditional = null;
+                consumedInIf = null;
+                consumedInLoop = null;
+                // Fall through to re-evaluate.
+              }
+            }
+
+            // If the consuming site was inside a loop body, and this
+            // reference is AFTER the loop (not inside it), reset —
+            // the variable could be alive at loop entry and code after.
+            if (consumedBy !== null && consumedInLoop) {
+              const loopEnd = consumedInLoop.range?.[1] ?? 0;
+              const refStart = ref.identifier.range?.[0] ?? 0;
+              if (refStart >= loopEnd) {
+                consumedBy = null;
+                consumedInLoop = null;
+                consumedInIf = null;
+                consumedInConditional = null;
+                // Fall through to re-evaluate.
+              }
+            }
+          }
+
+          if (consumedBy !== null) {
+            // Check for expression evaluation order: if this reference is
+            // inside the arguments of the SAME call that consumed the var
+            // (e.g., `x.reshape([1, ...x.shape])`), JS evaluates arguments
+            // before the method call — so this is NOT a use-after-consume.
+            if (isInArgumentsOfSameConsumingCall(ref.identifier, consumedBy)) {
+              continue;
+            }
+
+            // If both the consuming site and this reference are in mutually
+            // exclusive branches of the same ternary (e.g., `cond ? x.add(1) : x.sub(1)`),
+            // they never both execute — skip.
+            if (areInMutuallyExclusiveBranches(ref.identifier, consumedBy.identifier)) {
+              // Check if this ref is ALSO a consuming site. If so, BOTH branches
+              // consume → the consumption is unconditional. Update consumedBy
+              // but clear consumedInConditional since both paths lead to consumption.
+              const siteInOtherBranch = getConsumingSite(ref.identifier);
+              if (siteInOtherBranch && !isConsumeAndReassign(ref.identifier, varName)) {
+                consumedBy = siteInOtherBranch;
+                consumedInConditional = null; // both branches consume → unconditional
+                consumedInIf = getTerminatingIfAncestor(ref.identifier);
+                consumedInLoop = getEnclosingLoop(ref.identifier);
+                continue;
+              }
+              // Only one branch consumes — reset for code after the conditional.
+              consumedBy = null;
+              consumedInIf = null;
+              consumedInConditional = null;
+              consumedInLoop = null;
+              // Fall through to the consuming-site detection below.
             }
           }
 
@@ -429,6 +747,8 @@ const rule: Rule.RuleModule = {
             }
             consumedBy = site;
             consumedInIf = getTerminatingIfAncestor(ref.identifier);
+            consumedInConditional = getConditionalAncestor(ref.identifier);
+            consumedInLoop = getEnclosingLoop(ref.identifier);
           }
         }
       },
