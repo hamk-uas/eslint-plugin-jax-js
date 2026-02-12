@@ -307,6 +307,104 @@ plus a conservative set of JAX functions likely to be added soon (marked with
 
 If jax-js adds new methods, update `src/api-surface.generated.ts` accordingly.
 
+## Maintainer Guide
+
+This section is for maintainers of the plugin itself — if you're just using the plugin
+in your project, you can stop reading here.
+
+### Updating for a New jax-js Version
+
+When a new version of [jax-js](https://github.com/ekzhang/jax-js) is released, follow these steps
+to bring the plugin up to date.
+
+#### 1. Review the upstream changes
+
+Open the jax-js release notes or diff the `Array` / `Tracer` classes to identify:
+
+- **New getters** (non-consuming properties like `.shape`).
+- **New methods** (consuming operations like `.add()`).
+- **Removed or renamed** members.
+- **Changes to the ownership model** (rare — would require a major plugin version bump).
+
+#### 2. Update the API surface file
+
+Edit `src/api-surface.generated.ts`:
+
+- Add new getters to `EXTRACTED_GETTERS`.
+- Add new methods to `EXTRACTED_METHODS`.
+- Remove any members that no longer exist.
+- Update the version comment at the top of the file.
+
+#### 3. Update manual sets in `src/shared.ts`
+
+Most sets are derived automatically, but three require manual curation:
+
+| Set | When to update |
+|-----|----------------|
+| `CONSUMING_TERMINAL_METHODS` | A new method returns a non-Array value (e.g., a new serialization method). |
+| `UNAMBIGUOUS_ARRAY_METHODS` | A new method name doesn't collide with standard JS APIs. |
+| `NON_CONSUMING_METHODS` | A new method does not consume the array (like `blockUntilReady`). |
+
+Also check `ARRAY_FACTORY_NAMES` if jax-js adds new top-level factory functions.
+
+#### 4. Update peer dependency range
+
+In `package.json`, widen or bump the `@jax-js/jax` peer dependency range:
+
+```jsonc
+"peerDependencies": {
+  "@jax-js/jax": ">=0.1.0 <0.4.0"  // ← adjust upper bound
+}
+```
+
+#### 5. Add tests for new patterns
+
+If new methods introduce novel consuming/non-consuming behaviors, add test cases to the
+relevant test files in `test/`.
+
+#### 6. Bump version and publish
+
+Follow the publishing steps below.
+
+### Publishing
+
+#### Prerequisites
+
+- [Node.js](https://nodejs.org/) (v18+) and npm.
+- An [npm account](https://www.npmjs.com/signup) with publish access to `eslint-plugin-jax-js`.
+- Authenticated locally: `npm login`.
+
+#### Steps
+
+```bash
+# 1. Make sure tests pass and there are no type errors
+npm test
+npx tsc --noEmit
+
+# 2. Bump the version (choose patch / minor / major as appropriate)
+npm version patch   # e.g., 0.1.0 → 0.1.1
+# This updates package.json and creates a git tag.
+# Remember to also update the version string in src/index.ts to match.
+
+# 3. Push the commit and tag
+git push && git push --tags
+
+# 4. Publish to npm
+npm publish
+
+# 5. (Optional) Create a GitHub release
+#    Go to https://github.com/hamk-uas/eslint-plugin-jax-js/releases/new
+#    Select the tag, write release notes summarizing changes.
+```
+
+#### Version numbering
+
+| Change | Bump |
+|--------|------|
+| New jax-js methods added to API surface | **patch** |
+| New lint rule or rule behavior change | **minor** |
+| Breaking: removed rule, changed defaults, ownership model change | **major** |
+
 ## License
 
 MIT
