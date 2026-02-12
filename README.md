@@ -60,7 +60,7 @@ The plugin requires **ESLint v9+** (flat config). It ships as TypeScript source
 Each rule reports warnings and can offer automatic code changes through ESLint:
 
 - **Autofix** (ESLint *fix*) — applied automatically on save or via `eslint --fix`.
-  Safe transforms that never change program behavior.
+  The rule has verified that the change is safe for the specific code it flagged.
 - **Suggestion** (ESLint *suggestion*) — shown as a lightbulb (💡) quick fix in your editor.
   Requires manual confirmation because the change may need review (e.g., inserting `.ref`
   means you also need a matching `.dispose()`).
