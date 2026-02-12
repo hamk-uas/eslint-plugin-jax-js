@@ -198,6 +198,57 @@ function unwrapTransparentExpression(node: any): any {
 }
 
 // ---------------------------------------------------------------------------
+// Jax-js namespace detection
+// ---------------------------------------------------------------------------
+
+/** Import aliases commonly used for jax-js modules. */
+export const JAX_NAMESPACES = new Set<string>([
+  "np",
+  "jnp",
+  "numpy",
+  "lax",
+  "nn",
+  "random",
+  "jax",
+  "tree",
+  // Future-proof: JAX namespaces likely coming to jax-js
+  "scipy",
+  "linalg",
+]);
+
+/**
+ * Check if a call expression's callee is a jax-js namespace function
+ * (e.g., `np.multiply`, `lax.linalg.cholesky`).
+ */
+export function isJaxNamespaceCall(callee: ESTree.Expression): boolean {
+  if (
+    callee.type !== "MemberExpression" ||
+    callee.computed ||
+    callee.property.type !== "Identifier"
+  ) {
+    return false;
+  }
+  // np.func(), lax.func()
+  if (
+    callee.object.type === "Identifier" &&
+    JAX_NAMESPACES.has(callee.object.name)
+  ) {
+    return true;
+  }
+  // lax.linalg.func() — nested namespace
+  if (
+    callee.object.type === "MemberExpression" &&
+    !callee.object.computed &&
+    callee.object.property.type === "Identifier" &&
+    callee.object.object.type === "Identifier" &&
+    JAX_NAMESPACES.has(callee.object.object.name)
+  ) {
+    return true;
+  }
+  return false;
+}
+
+// ---------------------------------------------------------------------------
 // Scope & AST utilities
 // ---------------------------------------------------------------------------
 
@@ -239,6 +290,58 @@ export function isNonConsumingReference(ref: {
     !parent.computed &&
     parent.property.type === "Identifier" &&
     NON_CONSUMING_PROPS.has(parent.property.name)
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Check if a reference is a consuming use of the variable:
+ *   1. Method call: x.add(...), x.dispose()
+ *   2. Argument to a jax-js namespace function: np.multiply(x, ...)
+ *
+ * This is stricter than `!isNonConsumingReference()` — it requires positive
+ * evidence of consumption, not just "not a property access".
+ */
+export function isConsumingReference(ref: {
+  identifier: ESTree.Identifier;
+}): boolean {
+  const parent = parentOf(ref.identifier);
+  if (!parent) return false;
+
+  // Pattern 1: x.method(...)
+  if (
+    parent.type === "MemberExpression" &&
+    parent.object === ref.identifier &&
+    !parent.computed &&
+    parent.property.type === "Identifier"
+  ) {
+    const prop = parent.property.name;
+    if (
+      !ARRAY_RETURNING_METHODS.has(prop) &&
+      !CONSUMING_TERMINAL_METHODS.has(prop)
+    ) {
+      return false;
+    }
+    const gp = parentOf(parent);
+    return (
+      gp?.type === "CallExpression" &&
+      (gp as ESTree.CallExpression).callee === parent
+    );
+  }
+
+  // Pattern 2: argument to a function call.
+  // Jax namespace calls (np.multiply(x)) are definitely consuming.
+  // Bare function calls (subtract(x)) could be consuming if the function
+  // is an imported jax-js op — we can't tell without import tracking,
+  // so we conservatively treat any function-argument pass as consuming.
+  if (
+    parent.type === "CallExpression" &&
+    (parent as ESTree.CallExpression).arguments.includes(
+      ref.identifier as any,
+    )
   ) {
     return true;
   }

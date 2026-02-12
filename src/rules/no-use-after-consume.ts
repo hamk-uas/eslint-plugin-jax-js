@@ -20,27 +20,17 @@ import {
   CONSUMING_TERMINAL_METHODS,
   findVariable,
   isArrayInit,
+  isJaxNamespaceCall,
+  JAX_NAMESPACES,
   parentOf,
 } from "../shared";
 
 // ---------------------------------------------------------------------------
-// Jax-js namespace detection
+// Jax-js namespace description (uses shared detection)
 // ---------------------------------------------------------------------------
 
 /** Import aliases commonly used for jax-js modules. */
-const JAX_NAMESPACES = new Set([
-  "np",
-  "jnp",
-  "numpy",
-  "lax",
-  "nn",
-  "random",
-  "jax",
-  "tree",
-  // Future-proof: JAX namespaces likely coming to jax-js
-  "scipy",
-  "linalg",
-]);
+// (JAX_NAMESPACES is now imported from shared.ts)
 
 /**
  * If the callee is a jax-js namespace function, return a human-readable
@@ -54,6 +44,7 @@ function describeJaxCall(callee: ESTree.Expression): string | null {
   ) {
     return null;
   }
+  if (!isJaxNamespaceCall(callee)) return null;
   const prop = callee.property.name;
   // np.func(), lax.func()
   if (

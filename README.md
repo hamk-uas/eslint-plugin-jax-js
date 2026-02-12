@@ -15,7 +15,8 @@ npm install --save-dev github:hamk-uas/eslint-plugin-jax-js#v0.1.0
 
 Replace `v0.1.0` with the [latest release tag](https://github.com/hamk-uas/eslint-plugin-jax-js/releases).
 
-The plugin requires **ESLint v9+** (flat config).
+The plugin requires **ESLint v9+** (flat config). It ships as TypeScript source
+(no build step needed) — ESLint v9 loads it via its built-in `jiti` transpiler.
 
 ## Rules
 
@@ -284,6 +285,26 @@ The rules understand several patterns:
 - **Mutually exclusive if-branches** (e.g., early return) are handled correctly.
 - **Closures** (e.g., `expect(() => ...).toThrow()`) are conservatively skipped.
 - **Borrowed bindings** (callback params, for-of vars) with `.ref` are treated as intentional cloning.
+
+### Design decisions & known limitations
+
+- **`require-consume` treats `.ref` capture as consuming.** When you write
+  `const y = x.ref`, the rule considers `x` consumed — you've opted into manual
+  reference counting, and flagging `x` would be noisy. The trade-off: if `y` is
+  never disposed, the leak won't be caught by `require-consume` on `x` (though
+  it will be caught on `y` if `y` is also tracked).
+
+- **TypeScript source, no build step.** The plugin ships raw `.ts` files and relies
+  on ESLint v9's `jiti` transpiler. This simplifies development and contribution
+  but means the plugin won't work with ESLint v8 or custom loaders that don't
+  support TypeScript.
+
+- **Heuristic-based, no import tracking.** The rules identify jax-js arrays by
+  recognizing factory calls (`np.zeros()`), method names (`.add()`, `.reshape()`),
+  and namespace prefixes (`np.*`, `lax.*`). They do not resolve imports, so a
+  function call like `foo(x)` won't be recognized as consuming even if `foo` is a
+  re-exported jax-js operation. This is conservative — it avoids false positives
+  at the cost of occasional false negatives for unusual import patterns.
 
 ## API Surface & Compatibility
 

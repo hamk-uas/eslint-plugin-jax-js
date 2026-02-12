@@ -60,7 +60,10 @@ const rule: Rule.RuleModule = {
 
         // If the variable is consumed BEFORE this `.ref` in source order,
         // the `.ref` is justified (keeps array alive for a later use).
-        // e.g., `equal(a, min(a.ref, ...))`.
+        // e.g., `equal(a, min(a.ref, ...))` or `foo(x); x.ref.dataSync()`.
+        // Any non-property read counts as a potential consuming use because
+        // jax-js uses move semantics — passing an array to any function
+        // transfers ownership.
         for (const ref of allRefs.slice(0, idx)) {
           if (ref.isRead() && !isNonConsumingReference(ref)) return;
         }
