@@ -52,9 +52,9 @@ Consumption is detected from:
 2. **Passing the array to any function**: `np.multiply(x, y)`, `myHelper(x)`,
    `obj.process(x)` — under move semantics, passing an array transfers ownership.
 
-Known non-consuming callees (`console.log`, `JSON.stringify`, `expect`, etc.)
+Known non-consuming callees (`console.log`, `expect`, etc.)
 are automatically excluded. For your own non-consuming helpers, add a
-`// @jax-safe` comment:
+`// @jax-borrow` comment:
 
 ```ts
 // ❌ Bad — x is consumed by .add(), then used again
@@ -73,9 +73,9 @@ x.ref.add(1);
 x.shape;
 x.dispose();
 
-// ✅ Good — @jax-safe marks a non-consuming call
+// ✅ Good — @jax-borrow marks a non-consuming call
 const x = np.zeros([3]);
-myLogger(x); // @jax-safe
+myLogger(x); // @jax-borrow
 x.dispose();
 ```
 
@@ -321,9 +321,9 @@ The rules understand several patterns:
   and namespace prefixes (`np.*`, `lax.*`). They do not resolve imports, so:
   - All three rules treat **any function argument pass as consuming** under
     move semantics. `no-use-after-consume` additionally maintains a safe-list
-    of known non-consuming callees (`console.log`, `JSON.stringify`, `expect`,
+    of known non-consuming callees (`console.log`, `expect`,
     etc.) to avoid false positives from debugging/testing code.
-  - For custom non-consuming helpers, use the `// @jax-safe` comment directive
+  - For custom non-consuming helpers, use the `// @jax-borrow` comment directive
     to suppress consumption tracking on that call.
 
   This is conservative overall — it avoids false positives at the cost of

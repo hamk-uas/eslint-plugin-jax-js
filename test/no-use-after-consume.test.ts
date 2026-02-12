@@ -30,8 +30,8 @@ describe("no-use-after-consume", () => {
         // console.log is safe-listed — does NOT consume
         "const x = np.zeros([3]); console.log(x); x.dispose();",
 
-        // JSON.stringify is safe-listed — does NOT consume
-        "const x = np.zeros([3]); JSON.stringify(x); x.dispose();",
+        // Non-consuming member access passed to another function — x itself is not an argument
+        "const x = np.zeros([3]); JSON.stringify(x.shape); x.dispose();",
 
         // expect() is safe-listed — does NOT consume
         "const x = np.zeros([3]); expect(x).toBeDefined(); x.dispose();",
@@ -42,20 +42,20 @@ describe("no-use-after-consume", () => {
         // assert.deepEqual is safe-listed (object method) — does NOT consume
         "const x = np.zeros([3]); assert.deepEqual(x, y); x.dispose();",
 
-        // @jax-safe comment directive suppresses consumption tracking
+        // @jax-borrow comment directive suppresses consumption tracking
         {
           code: `
             const x = np.zeros([3]);
-            myLogger(x); // @jax-safe
+            myLogger(x); // @jax-borrow
             x.dispose();
           `,
         },
 
-        // @jax-safe on the line above the call
+        // @jax-borrow on the line above the call
         {
           code: `
             const x = np.zeros([3]);
-            // @jax-safe
+            // @jax-borrow
             myLogger(x);
             x.dispose();
           `,

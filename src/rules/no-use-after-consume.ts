@@ -14,9 +14,9 @@
  *      an array transfers ownership.
  *
  * Exceptions:
- *   - Known safe callees that never consume (console.log, JSON.stringify,
- *     expect, etc.) are automatically excluded.
- *   - A `// @jax-safe` comment on the call line suppresses consumption
+ *   - Known safe callees that never consume (console.log, expect, etc.)
+ *     are automatically excluded.
+ *   - A `// @jax-borrow` comment on the call line suppresses consumption
  *     tracking for that call, for user-defined non-consuming helpers.
  *
  * To keep an array alive past a consuming call, use `.ref` at the
@@ -40,33 +40,25 @@ import {
 
 /**
  * Object names whose method calls (`obj.method(x)`) never consume jax arrays.
- * Built-in objects and testing utilities.
+ *
+ * console — logging/debugging (console.log, console.warn, etc.)
+ * assert  — Node.js assert module (assert.deepEqual, assert.ok, etc.)
  */
-const SAFE_CALLEE_OBJECTS = new Set<string>([
-  "console",
-  "JSON",
-  "Object",
-  "Array",
-  "Promise",
-  "Reflect",
-  "assert",
-]);
+const SAFE_CALLEE_OBJECTS = new Set<string>(["console", "assert"]);
 
 /**
  * Bare function names (`func(x)`) known not to consume jax arrays.
- * Type coercion, number parsing, and testing utilities.
+ *
+ * expect — vitest/jest assertion entry point (expect(x).toBeDefined())
+ * assert — Node.js assert() or chai assert()
+ * String — type coercion, calls toString()
+ * Number — type coercion for scalar arrays
  */
 const SAFE_CALLEE_NAMES = new Set<string>([
-  "String",
-  "Number",
-  "Boolean",
-  "BigInt",
-  "parseInt",
-  "parseFloat",
-  "isNaN",
-  "isFinite",
   "expect",
   "assert",
+  "String",
+  "Number",
 ]);
 
 /** Is the callee known not to consume jax arrays? */
@@ -162,7 +154,7 @@ function getConsumingSite(identifier: ESTree.Identifier): ConsumingSite | null {
 
   // Pattern 2: x passed as argument to any function call.
   // Under move semantics, passing an array transfers ownership.
-  // Exceptions: known safe callees (console.log, etc.) — the @jax-safe
+  // Exceptions: known safe callees (console.log, etc.) — the @jax-borrow
   // comment directive is checked separately in the main loop.
   if (
     parent.type === "CallExpression" &&
@@ -343,7 +335,7 @@ const rule: Rule.RuleModule = {
     const sourceLines = (sourceCode.getText?.() ?? "").split("\n");
 
     /**
-     * Check if the call containing `identifier` has a `// @jax-safe`
+     * Check if the call containing `identifier` has a `// @jax-borrow`
      * comment directive on the same line or the line above.
      */
     function lineHasJaxSafe(identifier: ESTree.Identifier): boolean {
@@ -353,7 +345,7 @@ const rule: Rule.RuleModule = {
       for (const ln of [line - 1, line]) {
         if (ln < 1) continue;
         const lineText = sourceLines[ln - 1];
-        if (lineText && /\/[/*].*@jax-safe/.test(lineText)) return true;
+        if (lineText && /\/[/*].*@jax-borrow/.test(lineText)) return true;
       }
       return false;
     }
@@ -431,7 +423,7 @@ const rule: Rule.RuleModule = {
 
           const site = getConsumingSite(ref.identifier);
           if (site && !isConsumeAndReassign(ref.identifier, varName)) {
-            // User can suppress arbitrary-call consumption via // @jax-safe
+            // User can suppress arbitrary-call consumption via // @jax-borrow
             if (site.kind === "argument" && lineHasJaxSafe(site.identifier)) {
               continue;
             }
