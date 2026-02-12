@@ -301,10 +301,17 @@ The rules understand several patterns:
 
 - **Heuristic-based, no import tracking.** The rules identify jax-js arrays by
   recognizing factory calls (`np.zeros()`), method names (`.add()`, `.reshape()`),
-  and namespace prefixes (`np.*`, `lax.*`). They do not resolve imports, so a
-  function call like `foo(x)` won't be recognized as consuming even if `foo` is a
-  re-exported jax-js operation. This is conservative — it avoids false positives
-  at the cost of occasional false negatives for unusual import patterns.
+  and namespace prefixes (`np.*`, `lax.*`). They do not resolve imports, so the
+  rules differ in how they handle unknown function calls like `foo(x)`:
+  - `require-consume` and `no-unnecessary-ref` treat any function argument pass
+    as consuming (move semantics) — no false positives, but also no warning if
+    the callee doesn't actually consume.
+  - `no-use-after-consume` only tracks consumption by recognized jax-js method
+    calls and namespace functions — so `foo(x); x.shape` won't warn even if
+    `foo` is a re-exported jax-js operation that consumes `x`.
+
+  This is conservative overall — it avoids false positives at the cost of
+  occasional false negatives for unusual import patterns.
 
 ## API Surface & Compatibility
 
