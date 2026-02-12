@@ -309,6 +309,13 @@ If jax-js adds new methods, update `src/api-surface.generated.ts` accordingly.
 
 ## Contributing
 
+Contributions are welcome! Please:
+
+- **Report bugs** by [opening an issue](https://github.com/hamk-uas/eslint-plugin-jax-js/issues/new)
+  with a minimal code snippet that triggers the wrong behavior.
+- **Submit fixes** as pull requests. Include a test case that reproduces the bug
+  (see [Fixing bugs](#fixing-bugs) below).
+
 ### Development setup
 
 After cloning the repo, install dependencies and enable the pre-commit hook:
@@ -355,20 +362,13 @@ Once the fix is published to npm, switch back:
 npm install --save-dev @hamk-uas/eslint-plugin-jax-js@latest
 ```
 
-## Maintainer Guide
-
-This section is for maintainers who publish releases to npm.
-
-### Bug Fixes
+### Fixing bugs
 
 1. **Reproduce** — add a failing test case to the relevant file in `test/`. Each test
    file uses ESLint's `RuleTester`, so a new entry in `valid` or `invalid` is usually
    enough to capture the bug.
 2. **Fix** — the rules live in `src/rules/`. Shared detection logic is in `src/shared.ts`.
 3. **Verify** — run `npm test` and `npx tsc --noEmit` to confirm the fix and catch regressions.
-4. **Version** — bug fixes are always a **patch** bump (`npm version patch`). Remember to
-   update the version string in `src/index.ts` to match.
-5. **Publish** — follow the [publishing steps](#publishing) below.
 
 #### Common bug categories
 
@@ -383,9 +383,19 @@ This section is for maintainers who publish releases to npm.
 
 - **Keep test-first discipline** — always add the failing test *before* writing the fix.
   This ensures the bug is actually reproduced and prevents regressions.
-- **One fix, one patch** — avoid bundling unrelated changes into a bug-fix release.
 - If a fix changes user-visible behavior (e.g., a rule now warns in a case it previously
-  allowed), mention it in the GitHub release notes so users know what to expect.
+  allowed), mention it in the PR description so maintainers know what to expect.
+
+## Maintainer Guide
+
+This section is for maintainers who publish releases to npm.
+
+### Releasing a bug fix
+
+1. Merge the PR with the fix.
+2. **Version** — bug fixes are always a **patch** bump (`npm version patch`). Remember to
+   update the version string in `src/index.ts` to match.
+3. **Publish** — follow the [publishing steps](#publishing) below.
 
 ### Updating for a New jax-js Version
 
