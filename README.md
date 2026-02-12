@@ -307,14 +307,11 @@ plus a conservative set of JAX functions likely to be added soon (marked with
 
 If jax-js adds new methods, update `src/api-surface.generated.ts` accordingly.
 
-## Maintainer Guide
+## Contributing
 
-This section is for maintainers of the plugin itself — if you're just using the plugin
-in your project, you can stop reading here.
+### Development setup
 
-### Initial setup
-
-After cloning the repo, enable the pre-commit hook:
+After cloning the repo, install dependencies and enable the pre-commit hook:
 
 ```bash
 npm install
@@ -324,38 +321,14 @@ git config core.hooksPath .githooks
 This runs tests and type-checking before every commit. The hook lives in
 `.githooks/pre-commit` and requires no extra dependencies.
 
-### Bug Fixes
+### Project structure
 
-#### Workflow
+- `src/rules/` — one file per lint rule.
+- `src/shared.ts` — shared detection logic (array-init heuristics, scope helpers, consuming-site detection).
+- `src/api-surface.generated.ts` — extracted method/getter lists from jax-js.
+- `test/` — one test file per rule, using ESLint's `RuleTester`.
 
-1. **Reproduce** — add a failing test case to the relevant file in `test/`. Each test
-   file uses ESLint's `RuleTester`, so a new entry in `valid` or `invalid` is usually
-   enough to capture the bug.
-2. **Fix** — the rules live in `src/rules/`. Shared detection logic (array-init heuristics,
-   scope helpers, consuming-site detection) is in `src/shared.ts`.
-3. **Verify** — run `npm test` and `npx tsc --noEmit` to confirm the fix and catch regressions.
-4. **Version** — bug fixes are always a **patch** bump (`npm version patch`). Remember to
-   update the version string in `src/index.ts` to match.
-5. **Publish** — follow the [publishing steps](#publishing) below.
-
-#### Common bug categories
-
-| Symptom | Likely location |
-|---------|-----------------|
-| False positive (warning on valid code) | The rule is too aggressive — check the consuming/non-consuming classification in `shared.ts` or the rule's visitor logic. |
-| False negative (no warning on buggy code) | The pattern isn't recognized — likely missing from `isArrayInit()`, factory/method sets, or the namespace list. |
-| Wrong autofix / suggestion | The `fix` or `suggest` callback in the rule — test the `output` field in `RuleTester`. |
-| Crash / exception in the rule | Usually a missing null-check on an AST node — add a guard and a regression test. |
-
-#### Tips
-
-- **Keep test-first discipline** — always add the failing test *before* writing the fix.
-  This ensures the bug is actually reproduced and prevents regressions.
-- **One fix, one patch** — avoid bundling unrelated changes into a bug-fix release.
-- If a fix changes user-visible behavior (e.g., a rule now warns in a case it previously
-  allowed), mention it in the GitHub release notes so users know what to expect.
-
-#### Testing a fix in your own project
+### Testing a fix in your own project
 
 If you notice a bug while using the plugin in another project, you can point that
 project at your local clone or development branch without waiting for a published release.
@@ -381,6 +354,38 @@ Once the fix is published to npm, switch back:
 ```bash
 npm install --save-dev eslint-plugin-jax-js@latest
 ```
+
+## Maintainer Guide
+
+This section is for maintainers who publish releases to npm.
+
+### Bug Fixes
+
+1. **Reproduce** — add a failing test case to the relevant file in `test/`. Each test
+   file uses ESLint's `RuleTester`, so a new entry in `valid` or `invalid` is usually
+   enough to capture the bug.
+2. **Fix** — the rules live in `src/rules/`. Shared detection logic is in `src/shared.ts`.
+3. **Verify** — run `npm test` and `npx tsc --noEmit` to confirm the fix and catch regressions.
+4. **Version** — bug fixes are always a **patch** bump (`npm version patch`). Remember to
+   update the version string in `src/index.ts` to match.
+5. **Publish** — follow the [publishing steps](#publishing) below.
+
+#### Common bug categories
+
+| Symptom | Likely location |
+|---------|-----------------|
+| False positive (warning on valid code) | The rule is too aggressive — check the consuming/non-consuming classification in `shared.ts` or the rule's visitor logic. |
+| False negative (no warning on buggy code) | The pattern isn't recognized — likely missing from `isArrayInit()`, factory/method sets, or the namespace list. |
+| Wrong autofix / suggestion | The `fix` or `suggest` callback in the rule — test the `output` field in `RuleTester`. |
+| Crash / exception in the rule | Usually a missing null-check on an AST node — add a guard and a regression test. |
+
+#### Tips
+
+- **Keep test-first discipline** — always add the failing test *before* writing the fix.
+  This ensures the bug is actually reproduced and prevents regressions.
+- **One fix, one patch** — avoid bundling unrelated changes into a bug-fix release.
+- If a fix changes user-visible behavior (e.g., a rule now warns in a case it previously
+  allowed), mention it in the GitHub release notes so users know what to expect.
 
 ### Updating for a New jax-js Version
 
