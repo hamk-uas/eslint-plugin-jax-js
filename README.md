@@ -7,6 +7,25 @@ If you create an array and never pass it to an operation or call `.dispose()`, t
 backend memory leaks. These lint rules catch the most common leak patterns statically, so you get
 red squiggles in your editor instead of discovering leaks at runtime with `checkLeaks`.
 
+## Design philosophy
+
+The plugin warns about ownership violations **everywhere**, including inside `jit()`
+callbacks. jax-js's `jit()` traces operations symbolically and does not actually consume
+arrays at trace time, so the warnings are technically false positives there. We warn
+anyway, on purpose:
+
+> **Write code that is ownership-correct in both jit and eager mode.**
+
+If your code only works under `jit()` tracing but leaks or crashes in eager mode, you
+cannot freely switch between the two — and switching is something you do often during
+development (debugging, profiling, adding logging). By keeping your code
+ownership-correct at all times, `jit()` becomes a pure performance optimization you can
+add or remove without changing program semantics.
+
+When a warning is genuinely wrong for your situation (e.g., a long-lived cache, or a
+pattern the heuristics cannot follow), suppress it with an `eslint-disable` comment and
+a short reason — see [Suppressing warnings](#suppressing-warnings-deliberate-exceptions).
+
 ## Installation
 
 ```bash
@@ -100,14 +119,15 @@ x.dispose();
 
 **Suggestion fix:** Adds `.dispose()` after last use.
 
-> **Note:** All three rules include the hint *(Can be ignored inside jit.)* since
-> jax-js's `jit()` traces array operations symbolically and does not actually consume arrays.
+> **Note:** All three rules include the hint *(Can be ignored inside jit.)* in their
+> messages. See [Design philosophy](#design-philosophy) for why the plugin warns inside
+> `jit()` anyway — in short, it encourages code that works in both jit and eager mode.
 
 ## Suppressing warnings (deliberate exceptions)
 
-Sometimes a warning is intentional (e.g., you knowingly keep an array alive in a cache, or you're
-inside a `jit()` callback where ownership rules are symbolic). In those cases, prefer disabling the
-specific rule as locally as possible, and include a short reason.
+Sometimes a warning is intentional (e.g., you knowingly keep an array alive in a cache).
+In those cases, prefer disabling the specific rule as locally as possible, and include a
+short reason.
 
 ```ts
 // eslint-disable-next-line @jax-js/no-use-after-consume -- inside jit(): traced, not executed
@@ -270,9 +290,9 @@ Or add it as a script in your `package.json`:
 ## Using in jax-js itself
 
 This plugin is also useful for developing jax-js itself — it catches leaks in tests, examples,
-and higher-level internal code that creates and consumes arrays. The only exception is code inside
-`jit()` callbacks, which traces symbolically rather than actually consuming arrays (all rule
-messages include the hint *"Can be ignored inside jit."*).
+and higher-level internal code that creates and consumes arrays. Code inside `jit()` callbacks
+will also trigger warnings even though tracing doesn't actually consume arrays — this is
+intentional (see [Design philosophy](#design-philosophy)).
 
 To enable it in the jax-js monorepo, add to the root `eslint.config.ts`:
 
