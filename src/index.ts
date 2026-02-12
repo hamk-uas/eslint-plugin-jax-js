@@ -7,6 +7,7 @@
 
 import type { ESLint } from "eslint";
 
+import pkg from "../package.json" with { type: "json" };
 import noUnnecessaryRef from "./rules/no-unnecessary-ref";
 import noUseAfterConsume from "./rules/no-use-after-consume";
 import requireConsume from "./rules/require-consume";
@@ -14,8 +15,7 @@ import requireConsume from "./rules/require-consume";
 const plugin: ESLint.Plugin = {
   meta: {
     name: "@hamk-uas/eslint-plugin-jax-js",
-    // Keep in sync with version in package.json
-    version: "0.1.0",
+    version: pkg.version,
   },
   rules: {
     "no-unnecessary-ref": noUnnecessaryRef,

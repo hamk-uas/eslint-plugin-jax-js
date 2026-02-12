@@ -558,10 +558,13 @@ Follow the releasing steps below.
 npm test
 npx tsc --noEmit
 
-# 2. Bump the version (choose patch / minor / major as appropriate)
-npm version patch   # e.g., 0.1.0 → 0.1.1
-# This updates package.json and creates a git tag (v0.1.1).
-# Remember to also update the version string in src/index.ts to match.
+# 2. Bump the version in package.json (choose patch / minor / major as appropriate)
+#    - package.json  →  "version": "0.1.1"
+#    src/index.ts reads the version from package.json automatically.
+#    Then commit and tag:
+git add package.json
+git commit -m "v0.1.1"
+git tag v0.1.1
 
 # 3. Push the commit and tag
 git push && git push --tags
