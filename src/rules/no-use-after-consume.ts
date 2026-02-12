@@ -4,9 +4,20 @@
  * Warns when a variable holding a jax-js Array is used after being consumed.
  *
  * In jax-js's consuming ownership model, most operations dispose their
- * input arrays. Using an array after it has been consumed (by a method
- * call like `.add()` or by passing it to a jax-js function like
- * `np.multiply()`) is a use-after-free bug.
+ * input arrays. Using an array after it has been consumed is a
+ * use-after-free bug.
+ *
+ * Consumption sources (in order of specificity):
+ *   1. Method call on the array: `x.add(1)`, `x.dispose()`
+ *   2. Passing the array to ANY function call: `np.multiply(x, y)`,
+ *      `myHelper(x)`, `obj.process(x)` — under move semantics, passing
+ *      an array transfers ownership.
+ *
+ * Exceptions:
+ *   - Known safe callees that never consume (console.log, JSON.stringify,
+ *     expect, etc.) are automatically excluded.
+ *   - A `// @jax-safe` comment on the call line suppresses consumption
+ *     tracking for that call, for user-defined non-consuming helpers.
  *
  * To keep an array alive past a consuming call, use `.ref` at the
  * consuming site: `x.ref.add(1)` instead of `x.add(1)`.
@@ -20,50 +31,82 @@ import {
   CONSUMING_TERMINAL_METHODS,
   findVariable,
   isArrayInit,
-  isJaxNamespaceCall,
-  JAX_NAMESPACES,
   parentOf,
 } from "../shared";
 
 // ---------------------------------------------------------------------------
-// Jax-js namespace description (uses shared detection)
+// Safe-callee lists (calls known NOT to consume jax-js arrays)
 // ---------------------------------------------------------------------------
 
-/** Import aliases commonly used for jax-js modules. */
-// (JAX_NAMESPACES is now imported from shared.ts)
+/**
+ * Object names whose method calls (`obj.method(x)`) never consume jax arrays.
+ * Built-in objects and testing utilities.
+ */
+const SAFE_CALLEE_OBJECTS = new Set<string>([
+  "console",
+  "JSON",
+  "Object",
+  "Array",
+  "Promise",
+  "Reflect",
+  "assert",
+]);
 
 /**
- * If the callee is a jax-js namespace function, return a human-readable
- * description like `np.multiply()`. Otherwise return null.
+ * Bare function names (`func(x)`) known not to consume jax arrays.
+ * Type coercion, number parsing, and testing utilities.
  */
-function describeJaxCall(callee: ESTree.Expression): string | null {
-  if (
-    callee.type !== "MemberExpression" ||
-    callee.computed ||
-    callee.property.type !== "Identifier"
-  ) {
-    return null;
+const SAFE_CALLEE_NAMES = new Set<string>([
+  "String",
+  "Number",
+  "Boolean",
+  "BigInt",
+  "parseInt",
+  "parseFloat",
+  "isNaN",
+  "isFinite",
+  "expect",
+  "assert",
+]);
+
+/** Is the callee known not to consume jax arrays? */
+function isSafeCallee(callee: ESTree.Expression): boolean {
+  if (callee.type === "Identifier") {
+    return SAFE_CALLEE_NAMES.has(callee.name);
   }
-  if (!isJaxNamespaceCall(callee)) return null;
-  const prop = callee.property.name;
-  // np.func(), lax.func()
   if (
-    callee.object.type === "Identifier" &&
-    JAX_NAMESPACES.has(callee.object.name)
+    callee.type === "MemberExpression" &&
+    callee.object.type === "Identifier"
   ) {
-    return `${callee.object.name}.${prop}()`;
+    return SAFE_CALLEE_OBJECTS.has(callee.object.name);
   }
-  // lax.linalg.func() — nested namespace
+  return false;
+}
+
+/** Human-readable description of a callee expression. */
+function describeCallee(callee: ESTree.Expression): string {
+  if (callee.type === "Identifier") {
+    return `${callee.name}()`;
+  }
   if (
-    callee.object.type === "MemberExpression" &&
-    !callee.object.computed &&
-    callee.object.property.type === "Identifier" &&
-    callee.object.object.type === "Identifier" &&
-    JAX_NAMESPACES.has(callee.object.object.name)
+    callee.type === "MemberExpression" &&
+    !callee.computed &&
+    callee.property.type === "Identifier"
   ) {
-    return `${callee.object.object.name}.${callee.object.property.name}.${prop}()`;
+    if (callee.object.type === "Identifier") {
+      return `${callee.object.name}.${callee.property.name}()`;
+    }
+    // nested: a.b.c()
+    if (
+      callee.object.type === "MemberExpression" &&
+      !callee.object.computed &&
+      callee.object.property.type === "Identifier" &&
+      callee.object.object.type === "Identifier"
+    ) {
+      return `${callee.object.object.name}.${callee.object.property.name}.${callee.property.name}()`;
+    }
   }
-  return null;
+  return "a function call";
 }
 
 // ---------------------------------------------------------------------------
@@ -117,16 +160,18 @@ function getConsumingSite(identifier: ESTree.Identifier): ConsumingSite | null {
     return null;
   }
 
-  // Pattern 2: np.func(x), lax.linalg.func(x)
+  // Pattern 2: x passed as argument to any function call.
+  // Under move semantics, passing an array transfers ownership.
+  // Exceptions: known safe callees (console.log, etc.) — the @jax-safe
+  // comment directive is checked separately in the main loop.
   if (
     parent.type === "CallExpression" &&
     (parent as ESTree.CallExpression).arguments.includes(identifier as any)
   ) {
     const callee = (parent as ESTree.CallExpression).callee;
-    if (callee.type !== "Super") {
-      const desc = describeJaxCall(callee);
-      if (desc) return { description: desc, identifier, kind: "argument" };
-    }
+    if (callee.type === "Super") return null;
+    if (isSafeCallee(callee)) return null;
+    return { description: describeCallee(callee), identifier, kind: "argument" };
   }
 
   return null;
@@ -295,6 +340,23 @@ const rule: Rule.RuleModule = {
 
   create(context) {
     const sourceCode = context.sourceCode ?? context.getSourceCode();
+    const sourceLines = (sourceCode.getText?.() ?? "").split("\n");
+
+    /**
+     * Check if the call containing `identifier` has a `// @jax-safe`
+     * comment directive on the same line or the line above.
+     */
+    function lineHasJaxSafe(identifier: ESTree.Identifier): boolean {
+      const call = parentOf(identifier);
+      const line = call?.loc?.start.line ?? identifier.loc?.start.line;
+      if (!line) return false;
+      for (const ln of [line - 1, line]) {
+        if (ln < 1) continue;
+        const lineText = sourceLines[ln - 1];
+        if (lineText && /\/[/*].*@jax-safe/.test(lineText)) return true;
+      }
+      return false;
+    }
 
     return {
       VariableDeclarator(node: ESTree.VariableDeclarator) {
@@ -369,6 +431,10 @@ const rule: Rule.RuleModule = {
 
           const site = getConsumingSite(ref.identifier);
           if (site && !isConsumeAndReassign(ref.identifier, varName)) {
+            // User can suppress arbitrary-call consumption via // @jax-safe
+            if (site.kind === "argument" && lineHasJaxSafe(site.identifier)) {
+              continue;
+            }
             consumedBy = site;
             consumedInIf = getTerminatingIfAncestor(ref.identifier);
           }

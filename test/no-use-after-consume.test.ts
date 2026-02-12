@@ -24,8 +24,45 @@ describe("no-use-after-consume", () => {
         // Reassignment resets consumption tracking
         "let x = np.zeros([3]); x.dispose(); x = np.ones([3]); x.add(1);",
 
-        // Passed to non-jax function — not tracked as consuming
-        "const x = np.zeros([3]); foo(x); bar(x);",
+        // Passed to non-jax function — consumes under move semantics, but no later use
+        "const x = np.zeros([3]); foo(x);",
+
+        // console.log is safe-listed — does NOT consume
+        "const x = np.zeros([3]); console.log(x); x.dispose();",
+
+        // JSON.stringify is safe-listed — does NOT consume
+        "const x = np.zeros([3]); JSON.stringify(x); x.dispose();",
+
+        // expect() is safe-listed — does NOT consume
+        "const x = np.zeros([3]); expect(x).toBeDefined(); x.dispose();",
+
+        // assert() is safe-listed — does NOT consume
+        "const x = np.zeros([3]); assert(x); x.dispose();",
+
+        // assert.deepEqual is safe-listed (object method) — does NOT consume
+        "const x = np.zeros([3]); assert.deepEqual(x, y); x.dispose();",
+
+        // @jax-safe comment directive suppresses consumption tracking
+        {
+          code: `
+            const x = np.zeros([3]);
+            myLogger(x); // @jax-safe
+            x.dispose();
+          `,
+        },
+
+        // @jax-safe on the line above the call
+        {
+          code: `
+            const x = np.zeros([3]);
+            // @jax-safe
+            myLogger(x);
+            x.dispose();
+          `,
+        },
+
+        // consume-and-reassign via user function: x = foo(x)
+        "let x = np.zeros([3]); x = myHelper(x); x.dispose();",
 
         // super() call — not tracked as consuming
         {
@@ -237,6 +274,55 @@ describe("no-use-after-consume", () => {
                   messageId: "suggestRef",
                   output:
                     "const x = np.array([[1,0],[0,1]]); lax.linalg.cholesky(x.ref); x.shape;",
+                },
+              ],
+            },
+          ],
+        },
+
+        // Use after passing to user function (move semantics)
+        {
+          code: "const x = np.zeros([3]); foo(x); x.shape;",
+          errors: [
+            {
+              messageId: "useAfterConsume",
+              suggestions: [
+                {
+                  messageId: "suggestRef",
+                  output: "const x = np.zeros([3]); foo(x.ref); x.shape;",
+                },
+              ],
+            },
+          ],
+        },
+
+        // Use after passing to user object method (move semantics)
+        {
+          code: "const x = np.zeros([3]); obj.process(x); x.shape;",
+          errors: [
+            {
+              messageId: "useAfterConsume",
+              suggestions: [
+                {
+                  messageId: "suggestRef",
+                  output:
+                    "const x = np.zeros([3]); obj.process(x.ref); x.shape;",
+                },
+              ],
+            },
+          ],
+        },
+
+        // Double pass to user function — second is use-after-consume
+        {
+          code: "const x = np.zeros([3]); foo(x); bar(x);",
+          errors: [
+            {
+              messageId: "useAfterConsume",
+              suggestions: [
+                {
+                  messageId: "suggestRef",
+                  output: "const x = np.zeros([3]); foo(x.ref); bar(x);",
                 },
               ],
             },

@@ -45,9 +45,16 @@ x.dispose();
 
 ### `@jax-js/no-use-after-consume`
 
-Warns when a variable holding a jax-js Array is used after being consumed by a method call
-(like `.add()`, `.dispose()`) or by passing it to a jax-js function (like `np.multiply()`).
-This is a **use-after-free bug**.
+Warns when a variable holding a jax-js Array is used after being consumed.
+Consumption is detected from:
+
+1. **Method calls** on the array: `.add()`, `.dispose()`, etc.
+2. **Passing the array to any function**: `np.multiply(x, y)`, `myHelper(x)`,
+   `obj.process(x)` — under move semantics, passing an array transfers ownership.
+
+Known non-consuming callees (`console.log`, `JSON.stringify`, `expect`, etc.)
+are automatically excluded. For your own non-consuming helpers, add a
+`// @jax-safe` comment:
 
 ```ts
 // ❌ Bad — x is consumed by .add(), then used again
@@ -55,10 +62,20 @@ const x = np.zeros([3]);
 x.add(1);
 x.shape; // use-after-consume!
 
+// ❌ Bad — foo(x) consumes x under move semantics
+const x = np.zeros([3]);
+foo(x);
+x.shape; // use-after-consume!
+
 // ✅ Good — use .ref to keep the array alive
 const x = np.zeros([3]);
 x.ref.add(1);
 x.shape;
+x.dispose();
+
+// ✅ Good — @jax-safe marks a non-consuming call
+const x = np.zeros([3]);
+myLogger(x); // @jax-safe
 x.dispose();
 ```
 
@@ -301,14 +318,13 @@ The rules understand several patterns:
 
 - **Heuristic-based, no import tracking.** The rules identify jax-js arrays by
   recognizing factory calls (`np.zeros()`), method names (`.add()`, `.reshape()`),
-  and namespace prefixes (`np.*`, `lax.*`). They do not resolve imports, so the
-  rules differ in how they handle unknown function calls like `foo(x)`:
-  - `require-consume` and `no-unnecessary-ref` treat any function argument pass
-    as consuming (move semantics) — no false positives, but also no warning if
-    the callee doesn't actually consume.
-  - `no-use-after-consume` only tracks consumption by recognized jax-js method
-    calls and namespace functions — so `foo(x); x.shape` won't warn even if
-    `foo` is a re-exported jax-js operation that consumes `x`.
+  and namespace prefixes (`np.*`, `lax.*`). They do not resolve imports, so:
+  - All three rules treat **any function argument pass as consuming** under
+    move semantics. `no-use-after-consume` additionally maintains a safe-list
+    of known non-consuming callees (`console.log`, `JSON.stringify`, `expect`,
+    etc.) to avoid false positives from debugging/testing code.
+  - For custom non-consuming helpers, use the `// @jax-safe` comment directive
+    to suppress consumption tracking on that call.
 
   This is conservative overall — it avoids false positives at the cost of
   occasional false negatives for unusual import patterns.
