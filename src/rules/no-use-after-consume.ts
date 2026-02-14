@@ -35,6 +35,39 @@ import {
 } from "../shared";
 
 // ---------------------------------------------------------------------------
+// Safe-after-dispose property accesses
+// ---------------------------------------------------------------------------
+
+/**
+ * Properties that may be safely accessed even after the array has been
+ * consumed / disposed.  `.refCount` is the canonical example — tests
+ * read it after `.dispose()` to verify the reference count dropped to 0
+ * (leak checking).
+ */
+const SAFE_AFTER_DISPOSE_PROPS = new Set<string>(["refCount"]);
+
+/**
+ * Returns `true` when `identifier` (a reference to the tracked variable)
+ * is used solely as the object of a member-expression that reads a
+ * property in `SAFE_AFTER_DISPOSE_PROPS`.  For example `x.refCount`
+ * where `x` is the identifier.
+ */
+function isSafeAfterDisposeAccess(identifier: ESTree.Identifier): boolean {
+  const parent = parentOf(identifier);
+  if (
+    parent?.type === "MemberExpression" &&
+    (parent as ESTree.MemberExpression).object === identifier &&
+    !(parent as ESTree.MemberExpression).computed &&
+    (parent as ESTree.MemberExpression).property.type === "Identifier"
+  ) {
+    return SAFE_AFTER_DISPOSE_PROPS.has(
+      ((parent as ESTree.MemberExpression).property as ESTree.Identifier).name,
+    );
+  }
+  return false;
+}
+
+// ---------------------------------------------------------------------------
 // Safe-callee lists (calls known NOT to consume jax-js arrays)
 // ---------------------------------------------------------------------------
 
@@ -721,6 +754,12 @@ const rule: Rule.RuleModule = {
           }
 
           if (consumedBy !== null) {
+            // Safe-after-dispose property access (e.g. x.refCount for leak
+            // checking) — allowed even after consumption.
+            if (isSafeAfterDisposeAccess(ref.identifier)) {
+              continue;
+            }
+
             // Check for expression evaluation order: if this reference is
             // inside the arguments of the SAME call that consumed the var
             // (e.g., `x.reshape([1, ...x.shape])`), JS evaluates arguments

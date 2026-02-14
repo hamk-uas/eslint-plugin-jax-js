@@ -255,6 +255,9 @@ describe("no-use-after-consume", () => {
 
         // Boolean() is safe-listed
         "const x = np.zeros([3]); Boolean(x); x.dispose();",
+
+        // .refCount after dispose — allowed for leak checking
+        "const x = np.array([1, 2, 3]); x.dispose(); expect(x.refCount).toBe(0);",
       ],
 
       invalid: [
