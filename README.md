@@ -9,6 +9,8 @@ consuming operation, but forgetting to `.dispose()` the extra reference also lea
 These lint rules catch the most common leak patterns statically, so you get
 red squiggles in your editor instead of discovering leaks at runtime.
 
+🤖 AI generated code & documentation with gentle human supervision.
+
 ## Design philosophy
 
 The plugin warns about ownership violations **everywhere**, including inside `jit()`
