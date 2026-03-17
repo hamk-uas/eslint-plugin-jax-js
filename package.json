@@ -1,6 +1,6 @@
 {
   "name": "@hamk-uas/eslint-plugin-jax-js",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "ESLint plugin for catching jax-js array memory leaks at edit time — warns on use-after-consume, missing dispose, and unnecessary .ref",
   "keywords": [
     "eslint",
