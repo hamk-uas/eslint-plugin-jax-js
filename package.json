@@ -26,6 +26,10 @@
     "type": "git",
     "url": "https://github.com/hamk-uas/eslint-plugin-jax-js"
   },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
+    "access": "public"
+  },
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest"
