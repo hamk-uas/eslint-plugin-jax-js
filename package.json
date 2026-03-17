@@ -1,7 +1,7 @@
 {
   "name": "@hamk-uas/eslint-plugin-jax-js",
   "version": "0.1.4",
-  "description": "ESLint rules for jax-js array lifetime management — catch memory leaks at edit time (community plugin, not official)",
+  "description": "ESLint plugin for catching jax-js array memory leaks at edit time — warns on use-after-consume, missing dispose, and unnecessary .ref",
   "keywords": [
     "eslint",
     "eslintplugin",
