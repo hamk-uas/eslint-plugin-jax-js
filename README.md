@@ -42,40 +42,15 @@ If a warning doesn't apply to your situation, you have two options:
 
 ## Installation
 
-The plugin is published to [GitHub Packages](https://github.com/hamk-uas/eslint-plugin-jax-js/pkgs/npm/eslint-plugin-jax-js).
-
-**1. Configure the `@hamk-uas` scope** (one-time setup — add to your project's `.npmrc`):
-
-```
-@hamk-uas:registry=https://npm.pkg.github.com
-```
-
-You need a GitHub personal access token with `read:packages` scope.
-Set it in your **user-level** `~/.npmrc`:
-
-```
-//npm.pkg.github.com/:_authToken=YOUR_GITHUB_TOKEN
-```
-
-Or use an environment variable (safer):
-
-```
-//npm.pkg.github.com/:_authToken=${GITHUB_TOKEN}
-```
-
-**2. Install:**
-
 ```bash
 npm install --save-dev eslint jiti @typescript-eslint/parser @hamk-uas/eslint-plugin-jax-js
 ```
 
-**Alternative: install directly from Git** (no token needed):
+The plugin is published to
+[GitHub Packages](https://github.com/hamk-uas/eslint-plugin-jax-js/pkgs/npm/eslint-plugin-jax-js)
+as a public package — no authentication required.
 
-```bash
-npm install --save-dev eslint jiti @typescript-eslint/parser github:hamk-uas/eslint-plugin-jax-js
-```
-
-To pin a specific release tag:
+**Alternative: install directly from Git:**
 
 ```bash
 npm install --save-dev eslint jiti @typescript-eslint/parser github:hamk-uas/eslint-plugin-jax-js#v0.1.4
@@ -666,12 +641,6 @@ Users install specific tags, so after releasing they can upgrade with:
 
 ```bash
 npm install --save-dev @hamk-uas/eslint-plugin-jax-js@0.1.1
-```
-
-Or from Git:
-
-```bash
-npm install --save-dev github:hamk-uas/eslint-plugin-jax-js#v0.1.1
 ```
 
 #### Version numbering
