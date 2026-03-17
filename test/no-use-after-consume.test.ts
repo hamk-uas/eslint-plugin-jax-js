@@ -104,6 +104,9 @@ describe("no-use-after-consume", () => {
         // blockUntilReady — doesn't consume the array
         "const x = np.zeros([3]); x.blockUntilReady(); x.dispose();",
 
+        // .view() consumes, no later use — valid (v0.1.10)
+        "const x = np.zeros([3]); const y = x.view(np.int32); y.dispose();",
+
         // Closure references — consumption inside closures is not tracked
         // (function might throw before consuming, e.g. expect().toThrow())
         "const x = np.zeros([3]); expect(() => np.reshape(x, [99])).toThrow(); x.dispose();",
@@ -347,6 +350,22 @@ describe("no-use-after-consume", () => {
                   messageId: "suggestRef",
                   output:
                     "const x = np.zeros([3]); x.ref.add(1); x.shape; x.dtype;",
+                },
+              ],
+            },
+          ],
+        },
+
+        // Use after .view() (v0.1.10)
+        {
+          code: "const x = np.zeros([3]); x.view(np.int32); x.shape;",
+          errors: [
+            {
+              messageId: "useAfterConsume",
+              suggestions: [
+                {
+                  messageId: "suggestRef",
+                  output: "const x = np.zeros([3]); x.ref.view(np.int32); x.shape;",
                 },
               ],
             },

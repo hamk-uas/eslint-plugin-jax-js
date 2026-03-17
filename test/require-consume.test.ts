@@ -133,6 +133,14 @@ describe("require-consume", () => {
             const val = y.js();
           `,
         },
+        // Result of .view() consumed via .dispose() (v0.1.10)
+        {
+          code: `
+            const x = np.zeros([3]);
+            const y = x.view(np.int32);
+            y.dispose();
+          `,
+        },
         // Non-array variable — not flagged even if only property-accessed
         {
           code: `
@@ -294,6 +302,29 @@ x.dispose();
                   messageId: "suggestDispose",
                   output: `
             const y = x.reshape([3, 3]);
+y.dispose();
+          `,
+                },
+              ],
+            },
+          ],
+        },
+        // Result of .view() never consumed (v0.1.10)
+        // Receiver is an identifier whose declaration is a known array init
+        {
+          code: `
+            const x = np.zeros([3]);
+            const y = x.view(np.int32);
+          `,
+          errors: [
+            {
+              messageId: "neverConsumed",
+              suggestions: [
+                {
+                  messageId: "suggestDispose",
+                  output: `
+            const x = np.zeros([3]);
+            const y = x.view(np.int32);
 y.dispose();
           `,
                 },

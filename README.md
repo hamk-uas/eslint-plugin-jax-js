@@ -443,8 +443,8 @@ The rules understand several patterns:
 
 ## API Surface & Compatibility
 
-The plugin ships with an API surface list derived from **jax-js v0.1.9**
-([commit f900c28](https://github.com/ekzhang/jax-js/commit/f900c282880d61f1b9694208e731d6726919c5b6)),
+The plugin ships with an API surface list derived from **jax-js v0.1.10**
+([commit 693219b](https://github.com/ekzhang/jax-js/commit/693219b4769fdb25cf167f5b0056a6b0caaed755)),
 plus a conservative set of JAX functions likely to be added soon (marked with
 `// Future-proof` comments in `src/shared.ts`).
 

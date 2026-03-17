@@ -239,6 +239,18 @@ describe("no-unnecessary-ref", () => {
             const y = x.add(z);
           `,
         },
+        // .ref.view() where x is never used again (v0.1.10)
+        {
+          code: `
+            const x = array([1, 2, 3]);
+            const y = x.ref.view(np.int32);
+          `,
+          errors: [{ messageId: "unnecessaryRef" }],
+          output: `
+            const x = array([1, 2, 3]);
+            const y = x.view(np.int32);
+          `,
+        },
         // .ref followed only by non-consuming .shape access
         // (no autofix — removing .ref would break later .shape access)
         {

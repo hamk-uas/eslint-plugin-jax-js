@@ -20,7 +20,7 @@ import {
   ARRAY_RETURNING_METHODS,
   CONSUMING_TERMINAL_METHODS,
   findVariable,
-  isArrayInit,
+  isArrayInitOrTrackedMethod,
   NON_CONSUMING_PROPS,
   parentOf,
 } from "../shared";
@@ -119,10 +119,12 @@ const rule: Rule.RuleModule = {
     return {
       VariableDeclarator(node: ESTree.VariableDeclarator) {
         if (node.id.type !== "Identifier") return;
-        if (!isArrayInit(node.init)) return;
+
+        const scope = sourceCode.getScope(node);
+        if (!isArrayInitOrTrackedMethod(node.init, scope)) return;
 
         const varName = node.id.name;
-        const variable = findVariable(sourceCode.getScope(node), varName);
+        const variable = findVariable(scope, varName);
         if (!variable) return;
 
         const readRefs = variable.references.filter(

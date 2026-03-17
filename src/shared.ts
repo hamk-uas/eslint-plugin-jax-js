@@ -160,6 +160,22 @@ export function isArrayInit(
   ) {
     return true;
   }
+  // Chained array-returning method on a receiver already known to produce an
+  // array — e.g. `np.zeros([3]).view(np.int32)`.  This is narrower than the
+  // UNAMBIGUOUS_ARRAY_METHODS check above: it only fires when the receiver is
+  // itself recognizable, avoiding false positives from generic method names
+  // like `view` that also appear in non-jax code.
+  if (
+    unwrapped.type === "CallExpression" &&
+    unwrapped.callee.type === "MemberExpression" &&
+    !unwrapped.callee.computed &&
+    unwrapped.callee.property.type === "Identifier" &&
+    ARRAY_RETURNING_METHODS.has(unwrapped.callee.property.name) &&
+    unwrapped.callee.object.type !== "Super" &&
+    isArrayInit(unwrapped.callee.object)
+  ) {
+    return true;
+  }
   if (
     unwrapped.type === "MemberExpression" &&
     !unwrapped.computed &&
@@ -169,6 +185,46 @@ export function isArrayInit(
     return true;
   }
   if (unwrapped.type === "AwaitExpression") return isArrayInit(unwrapped.argument as any);
+  return false;
+}
+
+/**
+ * Like `isArrayInit`, but can also recognise `x.view(...)` / `x.add(...)`
+ * when `x` is a variable whose own declaration passes `isArrayInit`.
+ *
+ * This covers the common two-statement pattern:
+ *
+ *     const x = np.zeros([3]);
+ *     const y = x.view(np.int32);  // ← y should be tracked
+ *
+ * Pure `isArrayInit` misses it because the receiver is just an identifier.
+ * Call this variant from rules that already have scope access.
+ */
+export function isArrayInitOrTrackedMethod(
+  init: ESTree.Expression | null | undefined,
+  scope: any,
+): boolean {
+  if (isArrayInit(init)) return true;
+  if (!init) return false;
+
+  const unwrapped = unwrapTransparentExpression(init as any) as ESTree.Expression;
+  if (
+    unwrapped.type === "CallExpression" &&
+    unwrapped.callee.type === "MemberExpression" &&
+    !unwrapped.callee.computed &&
+    unwrapped.callee.property.type === "Identifier" &&
+    ARRAY_RETURNING_METHODS.has(unwrapped.callee.property.name) &&
+    unwrapped.callee.object.type === "Identifier"
+  ) {
+    const receiverVar = findVariable(scope, unwrapped.callee.object.name);
+    if (receiverVar) {
+      // Check the receiver variable's declaration initializer.
+      const decl = receiverVar.defs?.[0]?.node;
+      if (decl?.type === "VariableDeclarator" && isArrayInit(decl.init)) {
+        return true;
+      }
+    }
+  }
   return false;
 }
 

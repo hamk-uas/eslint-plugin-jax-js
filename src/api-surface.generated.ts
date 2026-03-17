@@ -1,4 +1,4 @@
-// Extracted from jax-js v0.1.9 — edit manually when jax-js adds new methods.
+// Extracted from jax-js v0.1.10 — edit manually when jax-js adds new methods.
 // See https://github.com/ekzhang/jax-js for the upstream source.
 //
 // The derived constant sets (NON_CONSUMING_PROPS, ARRAY_RETURNING_METHODS,
@@ -55,4 +55,5 @@ export const EXTRACTED_METHODS = [
   "sum",
   "toString",
   "transpose",
+  "view",
 ] as const;
