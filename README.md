@@ -42,14 +42,43 @@ If a warning doesn't apply to your situation, you have two options:
 
 ## Installation
 
+The plugin is published to [GitHub Packages](https://github.com/hamk-uas/eslint-plugin-jax-js/pkgs/npm/eslint-plugin-jax-js).
+
+**1. Configure the `@hamk-uas` scope** (one-time setup — add to your project's `.npmrc`):
+
+```
+@hamk-uas:registry=https://npm.pkg.github.com
+```
+
+You need a GitHub personal access token with `read:packages` scope.
+Set it in your **user-level** `~/.npmrc`:
+
+```
+//npm.pkg.github.com/:_authToken=YOUR_GITHUB_TOKEN
+```
+
+Or use an environment variable (safer):
+
+```
+//npm.pkg.github.com/:_authToken=${GITHUB_TOKEN}
+```
+
+**2. Install:**
+
+```bash
+npm install --save-dev eslint jiti @typescript-eslint/parser @hamk-uas/eslint-plugin-jax-js
+```
+
+**Alternative: install directly from Git** (no token needed):
+
 ```bash
 npm install --save-dev eslint jiti @typescript-eslint/parser github:hamk-uas/eslint-plugin-jax-js
 ```
 
-To pin a specific release tag instead of `main`:
+To pin a specific release tag:
 
 ```bash
-npm install --save-dev eslint jiti @typescript-eslint/parser github:hamk-uas/eslint-plugin-jax-js#v0.1.0
+npm install --save-dev eslint jiti @typescript-eslint/parser github:hamk-uas/eslint-plugin-jax-js#v0.1.4
 ```
 
 See [releases](https://github.com/hamk-uas/eslint-plugin-jax-js/releases) for available tags.
@@ -514,10 +543,10 @@ npm install --save-dev github:hamk-uas/eslint-plugin-jax-js#my-fix-branch
 Both methods make ESLint use the development version immediately. Since the plugin
 ships raw TypeScript (loaded via ESLint's `jiti` transpiler), no build step is needed.
 
-Once the fix is released, switch back to the tagged version:
+Once the fix is released, switch back to the published version:
 
 ```bash
-npm install --save-dev github:hamk-uas/eslint-plugin-jax-js#v0.1.1
+npm install --save-dev @hamk-uas/eslint-plugin-jax-js
 ```
 
 ### Fixing bugs
@@ -636,6 +665,12 @@ git push && git push --tags
 Users install specific tags, so after releasing they can upgrade with:
 
 ```bash
+npm install --save-dev @hamk-uas/eslint-plugin-jax-js@0.1.1
+```
+
+Or from Git:
+
+```bash
 npm install --save-dev github:hamk-uas/eslint-plugin-jax-js#v0.1.1
 ```
 
@@ -649,11 +684,17 @@ npm install --save-dev github:hamk-uas/eslint-plugin-jax-js#v0.1.1
 | New lint rule or rule behavior change | **minor** |
 | Breaking: removed rule, changed defaults, ownership model change | **major** |
 
-#### Future: npm publishing
+#### GitHub Packages
 
-If the user base grows, consider publishing to the npm registry for easier version
-management. The package.json is already set up for scoped publishing — just add
-`"publishConfig": { "access": "public" }` back, run `npm login`, and `npm publish`.
+The plugin is published to GitHub Packages on every release. After tagging,
+publish with:
+
+```bash
+GH_PACKAGE_TOKEN=... npm publish --registry=https://npm.pkg.github.com
+```
+
+The `publishConfig` in `package.json` and `.npmrc` are already configured.
+The `GH_PACKAGE_TOKEN` must have `write:packages` scope.
 
 ## License
 
