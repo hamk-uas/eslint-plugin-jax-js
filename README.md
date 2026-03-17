@@ -42,6 +42,14 @@ If a warning doesn't apply to your situation, you have two options:
 
 ## Installation
 
+**1. Point the `@hamk-uas` scope to GitHub Packages** (one-time, add to your project's `.npmrc`):
+
+```
+@hamk-uas:registry=https://npm.pkg.github.com
+```
+
+**2. Install:**
+
 ```bash
 npm install --save-dev eslint jiti @typescript-eslint/parser @hamk-uas/eslint-plugin-jax-js
 ```
@@ -50,10 +58,10 @@ The plugin is published to
 [GitHub Packages](https://github.com/hamk-uas/eslint-plugin-jax-js/pkgs/npm/eslint-plugin-jax-js)
 as a public package — no authentication required.
 
-**Alternative: install directly from Git:**
+**Alternative: install directly from Git** (no `.npmrc` needed):
 
 ```bash
-npm install --save-dev eslint jiti @typescript-eslint/parser github:hamk-uas/eslint-plugin-jax-js#v0.1.4
+npm install --save-dev eslint jiti @typescript-eslint/parser github:hamk-uas/eslint-plugin-jax-js#v0.1.5
 ```
 
 See [releases](https://github.com/hamk-uas/eslint-plugin-jax-js/releases) for available tags.
